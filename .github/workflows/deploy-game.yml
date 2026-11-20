@@ -56,7 +56,11 @@ jobs:
         run: npm run lint
 
       - name: Build upgraded game
-        run: npm run build -- --base=/Bassam-/
+        
+        run: |
+          cp public/assets/models/towers/gun_turret_l1_ready.glb public/assets/models/towers/gun_turret_l1.glb
+          npm run build -- --base=/Bassam-/
+
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
