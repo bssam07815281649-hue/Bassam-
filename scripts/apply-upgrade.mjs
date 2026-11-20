@@ -58,7 +58,7 @@ change('src/three/GameEngine.ts',s=>{
       this.houseHp=Math.max(1,Math.min(this.maxHouseHp,Number(saved.houseHp)||this.maxHouseHp));
       this.score=Math.max(0,Number(saved.score)||0);
       if(saved.stats&&typeof saved.stats==='object'){
-        for(const k of Object.keys(this.stats) as Array<keyof typeof this.stats>){
+        for(const k of Object.keys(this.stats) as Array<keyof GameEngine['stats']>){
           this.stats[k]=Math.max(0,Number(saved.stats[k])||0);
         }
       }
