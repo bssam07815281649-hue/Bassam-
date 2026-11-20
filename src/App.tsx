@@ -47,7 +47,10 @@ export default function App() {
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.55);
   const [activeModal, setActiveModal] = useState<'codex' | 'quests' | 'settings' | null>(null);
-  const [claimedQuests, setClaimedQuests] = useState<string[]>([]);
+  const [claimedQuests, setClaimedQuests] = useState<string[]>(() => {
+    try { const v=JSON.parse(localStorage.getItem('bassam-quest-claims-v1')||'[]');return Array.isArray(v)?v:[] }catch{return []}
+  });
+  const claimLockRef = useRef<Set<string>>(new Set(claimedQuests));
 
   useEffect(() => {
     const container = mountRef.current;
@@ -103,12 +106,17 @@ export default function App() {
   }, []);
 
   const handleClaimQuest = useCallback((questId: string, gold: number, wood: number) => {
+    if (claimLockRef.current.has(questId)) return;
+    claimLockRef.current.add(questId);
+    try { localStorage.setItem('bassam-quest-claims-v1', JSON.stringify([...claimLockRef.current])); } catch {}
     setClaimedQuests((prev) => (prev.includes(questId) ? prev : [...prev, questId]));
     engineRef.current?.grantQuestReward(gold, wood);
   }, []);
 
   const handleRestart = useCallback(() => {
     setClaimedQuests([]);
+    claimLockRef.current.clear();
+    try { localStorage.removeItem('bassam-quest-claims-v1'); } catch {}
     engineRef.current?.restartGame();
   }, []);
 

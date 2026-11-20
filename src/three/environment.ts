@@ -443,9 +443,9 @@ export function createEnvironment(
   terrainGeo.rotateX(-Math.PI / 2);
   const posAttr = terrainGeo.attributes.position;
   const colors = new Float32Array(posAttr.count * 3);
-  const cGrass = new THREE.Color(0x6ea632);
-  const cSunlit = new THREE.Color(0x88bf3f);
-  const cBank = new THREE.Color(0x527c2b);
+  const cGrass = new THREE.Color(0x547c3c);
+  const cSunlit = new THREE.Color(0x83a85a);
+  const cBank = new THREE.Color(0x425f3b);
 
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i);
@@ -495,7 +495,7 @@ export function createEnvironment(
   // 4. Flowing Animated River & Waterfall
   const riverGeo = createRoadRibbonGeometry(riverCurve, 4.3, 90);
   const waterMat = new THREE.MeshPhysicalMaterial({
-    color: 0x3b9bd1,
+    color: 0x327d8d,
     map: tex.waterNormal,
     roughness: 0.14,
     metalness: 0.08,

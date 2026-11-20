@@ -299,6 +299,21 @@ export class CombatEffects {
   }
 
   public dispose(): void {
+    // Release active effects without triggering their onImpact damage callbacks.
+    for (const p of this.projectiles) this.group.remove(p.mesh);
+    for (const b of this.bursts) {
+      this.group.remove(b.mesh);
+      (b.mesh.material as THREE.Material).dispose();
+    }
+    for (const beam of this.beams) {
+      this.group.remove(beam.line);
+      beam.line.geometry.dispose();
+      (beam.line.material as THREE.Material).dispose();
+    }
+    this.projectiles.length = 0;
+    this.bursts.length = 0;
+    this.beams.length = 0;
+    this.group.parent?.remove(this.group);
     this.bulletGeo.dispose();
     this.cannonGeo.dispose();
     this.sphereGeo.dispose();

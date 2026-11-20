@@ -18,6 +18,7 @@ import type {
 } from '../game/types';
 import { CombatEffects } from './CombatEffects';
 import { assetManager } from './assets/AssetManager';
+import { createEnvironmentUpgrade } from './EnvironmentUpgrade';
 import { createEnvironment, type EnvironmentRig } from './environment';
 import { createSharedMaterials, detectSoftwareWebGL, type SharedMaterials } from './materials';
 import { createEnemyRig, type EnemyRig } from './models/enemies';
@@ -73,6 +74,7 @@ export class GameEngine {
   private materials: SharedMaterials;
   private environment: EnvironmentRig;
   private vfx: CombatEffects;
+  private decoration!: ReturnType<typeof createEnvironmentUpgrade>;
 
   private towerLayerGroup = new THREE.Group();
   private enemyLayerGroup = new THREE.Group();
@@ -136,7 +138,7 @@ export class GameEngine {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
-    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, window.innerWidth < 780 ? 1.35 : 2));
     this.renderer.shadowMap.enabled = !this.isSoftwareGl;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -148,8 +150,8 @@ export class GameEngine {
 
     // Scene & Atmosphere
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x9ec6d8);
-    this.scene.fog = new THREE.FogExp2(0xb8d7e0, 0.0085);
+    this.scene.background = new THREE.Color(0xb1cbc5);
+    this.scene.fog = new THREE.FogExp2(0xb4d0c2, 0.0105);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -178,7 +180,7 @@ export class GameEngine {
     const sun = new THREE.DirectionalLight(0xfff1d0, 2.15);
     sun.position.set(22, 34, 18);
     sun.castShadow = !this.isSoftwareGl;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(window.innerWidth < 780 ? 1024 : 2048, window.innerWidth < 780 ? 1024 : 2048);
     sun.shadow.camera.left = -30;
     sun.shadow.camera.right = 30;
     sun.shadow.camera.top = 28;
@@ -200,6 +202,8 @@ export class GameEngine {
     this.materials = createSharedMaterials(this.textures, this.isSoftwareGl);
     this.environment = createEnvironment(this.textures, this.materials, this.isSoftwareGl);
     this.scene.add(this.environment.group);
+    this.decoration = createEnvironmentUpgrade(this.environment.roadCurve);
+    this.scene.add(this.decoration.group);
     this.scene.add(this.towerLayerGroup);
     this.scene.add(this.enemyLayerGroup);
     this.scene.add(this.labelLayerGroup);
@@ -246,6 +250,7 @@ export class GameEngine {
       this.renderer.compile(this.scene, this.camera);
     }
 
+    this.restoreCheckpoint();
     this.bindEvents();
     this.emitSnapshot(true);
     this.scheduleNextTick();
@@ -999,6 +1004,7 @@ export class GameEngine {
 
     // Environment animations (water, flag, chimney smoke)
     this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));
+    this.decoration.update(this.simTime);
     this.updateIndicators();
 
     if (this.paused || this.waveState === 'victory' || this.waveState === 'defeat') {
@@ -1217,10 +1223,59 @@ export class GameEngine {
     }
   }
 
+  /** Save only between waves; a mid-wave reload resumes at the last safe checkpoint. */
+  private saveCheckpoint(): void {
+    if (this.waveState !== 'countdown') return;
+    try {
+      const state = {
+        version: 1, waveIndex: this.waveIndex, gold: this.gold, wood: this.wood,
+        houseHp: this.houseHp, score: this.score, stats: this.stats,
+        towers: [...this.towers.values()].map(v=>({...v.data})),
+      };
+      window.localStorage.setItem('bassam-protect-house-checkpoint-v1',JSON.stringify(state));
+    } catch { /* Browsers may disable storage in privacy mode. */ }
+  }
+
+  private restoreCheckpoint(): void {
+    try {
+      const raw=window.localStorage.getItem('bassam-protect-house-checkpoint-v1');
+      if(!raw)return;
+      const saved=JSON.parse(raw);
+      if(saved?.version!==1||!Array.isArray(saved.towers)||
+         !Number.isFinite(saved.waveIndex)||saved.waveIndex<0||saved.waveIndex>=WAVES.length)return;
+      const validTowerTypes=['gun','cannon','sniper','lightning'];
+      this.waveIndex=saved.waveIndex;
+      this.gold=Math.max(0,Number(saved.gold)||0);
+      this.wood=Math.max(0,Number(saved.wood)||0);
+      this.houseHp=Math.max(1,Math.min(this.maxHouseHp,Number(saved.houseHp)||this.maxHouseHp));
+      this.score=Math.max(0,Number(saved.score)||0);
+      if(saved.stats&&typeof saved.stats==='object'){
+        for(const k of Object.keys(this.stats) as Array<keyof GameEngine['stats']>){
+          this.stats[k]=Math.max(0,Number(saved.stats[k])||0);
+        }
+      }
+      for(const t of saved.towers.slice(0,this.environment.buildPads.length)){
+        if(!validTowerTypes.includes(t.type)||![1,2,3].includes(t.level))continue;
+        const pad=this.environment.buildPads.find(p=>p.id===t.padId&&!p.occupied);
+        if(!pad)continue;
+        const rig=createTowerRig(t.type,t.level,this.materials);
+        const data: TowerInstance={...t,x:pad.x,z:pad.z,y:pad.group.position.y+.1,modelSource:rig.isExternalGLB?'glb':'procedural'};
+        rig.root.position.set(data.x,data.y,data.z);
+        rig.turretHead.rotation.y=Number(t.turretYaw)||0;
+        this.towerLayerGroup.add(rig.root);
+        this.towers.set(data.id,{data,rig,recoil:0,buildPop:0});
+        pad.occupied=true;
+        const parsed=Number(String(data.id).split('-').at(-1));
+        if(Number.isFinite(parsed))this.idCounter=Math.max(this.idCounter,parsed+1);
+      }
+    }catch(e){console.warn('[Save] Failed to restore checkpoint:',e)}
+  }
+
   private emitSnapshot(force = false): void {
     const now = performance.now();
     if (!force && now - this.lastSnapshotTime < 120) return;
     this.lastSnapshotTime = now;
+    if(force && this.waveState==='countdown')this.saveCheckpoint();
 
     const selectedTower = this.selectedTowerId ? this.towers.get(this.selectedTowerId)?.data ?? null : null;
 
@@ -1314,6 +1369,7 @@ export class GameEngine {
     this.controls.dispose();
     this.vfx.dispose();
     this.environment.dispose();
+    this.decoration.dispose();
     this.materials.dispose();
     this.textures.dispose();
     this.renderer.dispose();

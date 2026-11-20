@@ -241,7 +241,9 @@ class AssetManager {
       const gltf = await new Promise<GLTF>((resolve, reject) => {
         this.gltfLoader.load(url, resolve, undefined, reject);
       });
-      targetKeys.forEach((key) => {
+      // For tower uploads, override only the first level; installed L2/L3 GLBs stay intact.
+      const overrideKeys = slot.startsWith('tower_') ? targetKeys.slice(0, 1) : targetKeys;
+      overrideKeys.forEach((key) => {
         const spec = MODEL_CATALOG[key];
         const entry = this.normalizeGLTF(key, spec, gltf, file.name);
         this.failedKeys.delete(key);
