@@ -5,12 +5,14 @@ on:
   push:
     branches:
       - game-upgrade
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
+    if: github.ref == 'refs/heads/game-upgrade'
     runs-on: ubuntu-latest
     steps:
       - name: Download project
@@ -24,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-package-lock
 
-      - name: Apply upgrade in test environment
+      - name: Apply game upgrade
         run: node scripts/apply-upgrade.mjs
 
       - name: Check TypeScript
@@ -32,3 +34,13 @@ jobs:
 
       - name: Build game
         run: npm run build
+
+      - name: Save verified upgrade
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/three/GameEngine.ts src/three/CombatEffects.ts src/three/environment.ts src/three/assets/AssetManager.ts src/App.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m "Apply verified game upgrade"
+            git push origin HEAD:game-upgrade
+          fi
