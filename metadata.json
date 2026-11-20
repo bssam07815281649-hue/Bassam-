@@ -1,0 +1,6 @@
+{
+  "name": "Protect The House",
+  "description": "Stylized 3D miniature tower defense game. Build and upgrade Gun Turrets, Cannon Towers, Sniper Towers, and Lightning-Arrow Towers along the winding forest path to defend your fortified homestead.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
