@@ -58,6 +58,7 @@ export default function App() {
   const [showUpdateScreen, setShowUpdateScreen] = useState(shouldShowUpdateScreen);
   const [unavailable,setUnavailable]=useState(false);
   const [contextLost, setContextLost] = useState(false);
+  const [infantryModelStatus, setInfantryModelStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.55);
   const [activeModal, setActiveModal] = useState<'codex' | 'quests' | 'settings' | null>(null);
@@ -75,6 +76,7 @@ export default function App() {
       container,
       (nextSnap) => setSnapshot(nextSnap),
       (lost) => setContextLost(lost),
+      (loaded) => setInfantryModelStatus(loaded ? 'loaded' : 'failed'),
     );
     }catch(error){console.error(error);setUnavailable(true);return;}
     engineRef.current = engine;
@@ -175,6 +177,9 @@ export default function App() {
         </div>
       )}
 
+      <div dir="rtl" role="status" className={`fixed bottom-24 left-2 z-20 rounded-lg border px-2 py-1 text-[11px] font-bold shadow-md ${infantryModelStatus === 'loaded' ? 'border-emerald-300/40 bg-emerald-900/90 text-emerald-100' : infantryModelStatus === 'failed' ? 'border-red-300/50 bg-red-950/90 text-red-100' : 'border-amber-300/40 bg-slate-900/90 text-amber-100'}`}>
+        {infantryModelStatus === 'loaded' ? '✓ الجندي الجديد محمّل' : infantryModelStatus === 'failed' ? '⚠ فشل تحميل الجندي الجديد' : '… جاري تحميل الجندي الجديد'}
+      </div>
       <div className="fixed right-2 top-24 z-20 grid gap-1"><button aria-label="تكبير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(1.25)}>＋</button><button aria-label="تصغير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(.8)}>−</button></div>
       {/* Semantic HUD Overlay */}
       <TopHUD
