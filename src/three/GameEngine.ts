@@ -150,8 +150,8 @@ export class GameEngine {
 
     // Scene & Atmosphere
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xb1cbc5);
-    this.scene.fog = new THREE.FogExp2(0xb4d0c2, 0.0105);
+    this.scene.background = new THREE.Color(0xe4cb98);
+    this.scene.fog = new THREE.FogExp2(0xe8d5a8, 0.005);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -160,7 +160,7 @@ export class GameEngine {
     // Camera (Isometric miniature diorama angle)
     const aspect = Math.max(0.5, container.clientWidth / Math.max(1, container.clientHeight));
     this.camera = new THREE.PerspectiveCamera(40, aspect, 0.5, 220);
-    this.camera.position.set(-4, 30, 31);
+    this.camera.position.set(-1, 33, 34);
 
     this.controls = new MapControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !this.isSoftwareGl;
@@ -177,8 +177,8 @@ export class GameEngine {
     const hemi = new THREE.HemisphereLight(0xcbe8ff, 0x4b5c2b, 0.85);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xfff1d0, 2.15);
-    sun.position.set(22, 34, 18);
+    const sun = new THREE.DirectionalLight(0xffe2ae, 2.45);
+    sun.position.set(20, 32, -14);
     sun.castShadow = !this.isSoftwareGl;
     sun.shadow.mapSize.set(window.innerWidth < 780 ? 1024 : 2048, window.innerWidth < 780 ? 1024 : 2048);
     sun.shadow.camera.left = -30;
@@ -399,7 +399,7 @@ export class GameEngine {
   }
 
   public resetCamera(): void {
-    this.camera.position.set(-4, 30, 31);
+    this.camera.position.set(-1, 33, 34);
     this.controls.target.set(1, 0, 1);
     this.controls.update();
   }

@@ -2,6 +2,7 @@
   "present": [
     "/assets/models/towers/gun_turret_l1.glb",
     "/assets/models/towers/gun_turret_l2.glb",
-    "/assets/models/towers/gun_turret_l3.glb"
+    "/assets/models/towers/gun_turret_l3.glb",
+    "/assets/models/towers/archer_tower.glb"
   ]
 }

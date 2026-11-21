@@ -85,8 +85,8 @@ function createRoadRibbonGeometry(curve: THREE.CatmullRomCurve3, width: number, 
       const base = i * 5;
       const next = (i + 1) * 5;
       for (let c = 0; c < 4; c++) {
-        indices.push(base + c, next + c, base + c + 1);
-        indices.push(base + c + 1, next + c, next + c + 1);
+        indices.push(base + c, base + c + 1, next + c);
+        indices.push(base + c + 1, next + c + 1, next + c);
       }
     }
   }
@@ -443,9 +443,9 @@ export function createEnvironment(
   terrainGeo.rotateX(-Math.PI / 2);
   const posAttr = terrainGeo.attributes.position;
   const colors = new Float32Array(posAttr.count * 3);
-  const cGrass = new THREE.Color(0x547c3c);
-  const cSunlit = new THREE.Color(0x83a85a);
-  const cBank = new THREE.Color(0x425f3b);
+  const cGrass = new THREE.Color(0xb6b77a);
+  const cSunlit = new THREE.Color(0xe1d292);
+  const cBank = new THREE.Color(0x889462);
 
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i);
@@ -454,7 +454,8 @@ export function createEnvironment(
     posAttr.setY(i, vy);
 
     const riverD = distToSamples(vx, vz, riverSamples);
-    const tmp = cGrass.clone();
+    const meadow = 0.28 + 0.22 * Math.sin(vx * 0.31 + Math.cos(vz * 0.28)) * Math.cos(vz * 0.42);
+    const tmp = cGrass.clone().lerp(cSunlit, meadow);
     if (vy > 0.6) tmp.lerp(cSunlit, Math.min(1, vy * 0.35));
     if (riverD < 4.3) tmp.lerp(cBank, Math.max(0, 1 - riverD / 4.3) * 0.75);
     colors[i * 3] = tmp.r;
@@ -477,7 +478,7 @@ export function createEnvironment(
   group.add(terrainMesh);
 
   // 3. Winding S-Shaped Dirt Road
-  const roadGeo = createRoadRibbonGeometry(roadCurve, 2.35, 160);
+  const roadGeo = createRoadRibbonGeometry(roadCurve, 2.65, 160);
   const roadMat = new THREE.MeshStandardMaterial({
     map: tex.dirtMap,
     bumpMap: tex.dirtBump,
@@ -495,7 +496,7 @@ export function createEnvironment(
   // 4. Flowing Animated River & Waterfall
   const riverGeo = createRoadRibbonGeometry(riverCurve, 4.3, 90);
   const waterMat = new THREE.MeshPhysicalMaterial({
-    color: 0x327d8d,
+    color: 0x528e96,
     map: tex.waterNormal,
     roughness: 0.14,
     metalness: 0.08,
@@ -637,7 +638,14 @@ export function createEnvironment(
   addLantern(13.6, -10.8);
 
   // 8. Stylized Lush Forests (Deciduous + Conifer Pines) & Rocks (InstancedMesh for crisp FPS)
-  const treeCanopyGeo = new THREE.SphereGeometry(1, 10, 8);
+  const treeCanopyGeo = new THREE.IcosahedronGeometry(1, 2);
+  const leafVertices = treeCanopyGeo.attributes.position;
+  for (let i = 0; i < leafVertices.count; i++) {
+    const x = leafVertices.getX(i), y = leafVertices.getY(i), z = leafVertices.getZ(i);
+    const r = 1 + 0.09 * Math.cos(11*x + 3*z) * Math.sin(8*y - 5*z);
+    leafVertices.setXYZ(i, r*x, r*y, r*z);
+  }
+  treeCanopyGeo.computeVertexNormals();
   const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1.4, 7);
   const pineConeGeo = new THREE.ConeGeometry(1, 1.5, 7);
   const rockGeo = new THREE.DodecahedronGeometry(1, 1);
@@ -652,7 +660,7 @@ export function createEnvironment(
     metalness: 0.05,
   });
 
-  const deciduousColors = [0x61992b, 0x7cb335, 0x4b7f26, 0xd89328, 0xe3a832];
+  const deciduousColors = [0x91933c, 0xb59b44, 0x697d32, 0xc68b36, 0xb4a151];
   const pineColors = [0x2b6229, 0x34732d, 0x245424];
 
   const deciduousSpots: Array<{ x: number; z: number; scale: number; color: number }> = [];
@@ -661,9 +669,9 @@ export function createEnvironment(
 
   // Hand-curated scenic grove zones matching Image 1 & Image 2
   const groveZones: Array<{ cx: number; cz: number; rad: number; count: number; pineRatio: number }> = [
-    { cx: -18, cz: -14, rad: 8.5, count: 18, pineRatio: 0.15 }, // Top-left thick woodland
-    { cx: -24, cz: -2, rad: 7.5, count: 15, pineRatio: 0.25 }, // Mid-left forest
-    { cx: -21, cz: 21, rad: 7.5, count: 15, pineRatio: 0.85 }, // Bottom-left pine grove!
+    { cx: -18, cz: -14, rad: 8.5, count: 32, pineRatio: 0.15 }, // Top-left thick woodland
+    { cx: -24, cz: -2, rad: 7.5, count: 24, pineRatio: 0.25 }, // Mid-left forest
+    { cx: -21, cz: 21, rad: 7.5, count: 24, pineRatio: 0.85 }, // Bottom-left pine grove!
     { cx: -3, cz: -18, rad: 8.0, count: 14, pineRatio: 0.2 }, // Top-center grove
     { cx: 1, cz: 19, rad: 7.5, count: 13, pineRatio: 0.35 }, // Bottom-center edge
     { cx: 26, cz: -18, rad: 6.5, count: 10, pineRatio: 0.2 }, // Top-right behind house

@@ -158,7 +158,7 @@ export const MODEL_CATALOG: Record<AssetKey, ModelSpec> = {
   tower_lightning_l1: {
     key: 'tower_lightning_l1',
     category: 'tower',
-    path: '/assets/models/towers/lightning_tower_l1.glb',
+    path: '/assets/models/towers/archer_tower.glb',
     targetHeight: 2.55,
     forwardYawOffset: 0,
     groundOffsetY: 0,
@@ -168,7 +168,7 @@ export const MODEL_CATALOG: Record<AssetKey, ModelSpec> = {
   tower_lightning_l2: {
     key: 'tower_lightning_l2',
     category: 'tower',
-    path: '/assets/models/towers/lightning_tower_l2.glb',
+    path: '/assets/models/towers/archer_tower.glb',
     targetHeight: 2.75,
     forwardYawOffset: 0,
     groundOffsetY: 0,
@@ -178,7 +178,7 @@ export const MODEL_CATALOG: Record<AssetKey, ModelSpec> = {
   tower_lightning_l3: {
     key: 'tower_lightning_l3',
     category: 'tower',
-    path: '/assets/models/towers/lightning_tower_l3.glb',
+    path: '/assets/models/towers/archer_tower.glb',
     targetHeight: 3.0,
     forwardYawOffset: 0,
     groundOffsetY: 0,
