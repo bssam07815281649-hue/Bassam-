@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {obstacle,route} from '../game/forestGround';
+import {FOREST_MAP_EMBEDDED_URL} from './forestMapEmbedded';
 import type {BuildPadVisual,EnvironmentRig} from './environment';
 
 export const px=11, pz=px*2/3;
@@ -11,16 +12,28 @@ export function enchantedForest():EnvironmentRig{
  // Use a standard textured surface. Custom map_fragment shader hooks caused
  // incompatible WebGL rendering on some Android devices (black terrain).
  // Keep the original forest image and render it without runtime shader injection.
- const textureUrl=import.meta.env.BASE_URL+'assets/forest/map.webp';
+ // Bundled original forest map: no external asset URL or GitHub Pages path to break.
+ // If the browser cannot decode the image, fall back to visible grass rather than black.
+ const surface=new T.MeshBasicMaterial({color:0x79a951,toneMapped:false,fog:false});
  const map=new T.TextureLoader().load(
-   textureUrl,
+   FOREST_MAP_EMBEDDED_URL,
+   texture=>{
+     texture.colorSpace=T.SRGBColorSpace;
+     texture.anisotropy=4;
+     surface.map=texture;
+     surface.color.setHex(0xffffff);
+     surface.needsUpdate=true;
+   },
    undefined,
-   undefined,
-   error=>console.error('[Forest] Failed to load background image:',textureUrl,error),
+   error=>{
+     console.error('[Forest] Embedded battlefield image failed to decode:',error);
+     surface.map=null;
+     surface.color.setHex(0x79a951);
+     surface.needsUpdate=true;
+   },
  );
  map.colorSpace=T.SRGBColorSpace;
  map.anisotropy=4;
- const surface=new T.MeshBasicMaterial({map,toneMapped:false,fog:false,color:0xffffff});
  const ground=new T.Mesh(new T.PlaneGeometry(800/px,450/pz),surface);
  ground.rotation.x=-Math.PI/2;group.add(ground);
  const shadow=new T.Mesh(ground.geometry,new T.ShadowMaterial({opacity:.3}));shadow.rotation.copy(ground.rotation);shadow.position.y=.018;shadow.receiveShadow=true;group.add(shadow);
