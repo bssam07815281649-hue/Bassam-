@@ -12,6 +12,18 @@ import { QUESTS, WAVES } from './game/data';
 import type { GameSnapshot, TargetPriority, TowerType } from './game/types';
 import { GameEngine } from './three/GameEngine';
 
+// Each GitHub Pages deployment injects its commit SHA as the build identifier.
+const GAME_BUILD_ID = import.meta.env.VITE_APP_BUILD_ID || 'local-preview';
+const LAST_OPENED_BUILD_KEY = 'bassam-last-opened-game-build-v1';
+
+function shouldShowUpdateScreen(): boolean {
+  try {
+    return localStorage.getItem(LAST_OPENED_BUILD_KEY) !== GAME_BUILD_ID;
+  } catch {
+    return true;
+  }
+}
+
 const INITIAL_SNAPSHOT: GameSnapshot = {buildsLeft:2,upgradesLeft:1,
   gold: 480,
   wood: 140,
@@ -43,6 +55,7 @@ export default function App() {
   const engineRef = useRef<GameEngine | null>(null);
 
   const [snapshot, setSnapshot] = useState<GameSnapshot>(INITIAL_SNAPSHOT);
+  const [showUpdateScreen, setShowUpdateScreen] = useState(shouldShowUpdateScreen);
   const [unavailable,setUnavailable]=useState(false);
   const [contextLost, setContextLost] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -65,6 +78,7 @@ export default function App() {
     );
     }catch(error){console.error(error);setUnavailable(true);return;}
     engineRef.current = engine;
+    if (showUpdateScreen) engine.setPaused(true);
 
     return () => {
       engine.dispose();
@@ -122,6 +136,22 @@ export default function App() {
     try { localStorage.removeItem('bassam-quest-claims-v1'); } catch {}
     engineRef.current?.restartGame();
   }, []);
+
+  const closeUpdateScreen = useCallback(() => {
+    try { localStorage.setItem(LAST_OPENED_BUILD_KEY, GAME_BUILD_ID); } catch {}
+    setShowUpdateScreen(false);
+  }, []);
+
+  const handleContinueAfterUpdate = useCallback(() => {
+    engineRef.current?.setPaused(false);
+    closeUpdateScreen();
+  }, [closeUpdateScreen]);
+
+  const handleRestartAfterUpdate = useCallback(() => {
+    handleRestart();
+    engineRef.current?.setPaused(false);
+    closeUpdateScreen();
+  }, [handleRestart, closeUpdateScreen]);
 
   const handleChangePriority = useCallback((priority: TargetPriority) => {
     engineRef.current?.setSelectedTowerPriority(priority);
@@ -210,6 +240,29 @@ export default function App() {
       )}
 
       <GameResultModal snapshot={snapshot} onRestart={handleRestart} />
+
+      {showUpdateScreen && !unavailable && (
+        <div dir="rtl" role="dialog" aria-modal="true" aria-labelledby="update-screen-title" className="fixed inset-0 z-[80] flex items-center justify-center bg-[#080f11]/90 p-5 backdrop-blur-md">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/40 bg-gradient-to-b from-[#263b37] to-[#111d1c] p-6 text-center text-white shadow-2xl sm:p-8">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/15 text-4xl" aria-hidden="true">🏰</div>
+            <p className="mb-2 text-xs font-bold tracking-widest text-amber-300">حماية المنزل</p>
+            <h1 id="update-screen-title" className="font-display text-2xl font-extrabold text-white">اللعبة تحدّثت!</h1>
+            <p className="mx-auto mt-3 max-w-xs text-sm leading-7 text-stone-200">
+              وصل تحديث جديد للعبة. تگدر تكمل من آخر نقطة محفوظة، أو تبدأ لعبة جديدة.
+            </p>
+            <p className="mt-2 text-xs text-amber-200/80">الحفظ يكون بين الموجات، مو أثناء المعركة.</p>
+            <div className="mt-7 grid gap-3">
+              <button type="button" onClick={handleContinueAfterUpdate} className="min-h-14 rounded-xl border border-emerald-200/40 bg-emerald-500 px-5 py-3 text-lg font-extrabold text-[#08261b] shadow-lg transition active:scale-[0.98]">
+                ▶ استمرار اللعب
+              </button>
+              <button type="button" onClick={handleRestartAfterUpdate} className="min-h-14 rounded-xl border border-amber-300/50 bg-amber-400/15 px-5 py-3 text-lg font-bold text-amber-100 transition active:scale-[0.98]">
+                ↻ إعادة اللعب من البداية
+              </button>
+            </div>
+            <p className="mt-5 text-xs text-stone-400">إعادة اللعب تمسح تقدّم الجولة الحالية.</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
