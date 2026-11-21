@@ -43,3 +43,11 @@
 .custom-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(212, 168, 83, 0.7);
 }
+
+.citadel-control {
+  background: linear-gradient(155deg, #37566a, #192c3e 82%);
+  border: 1px solid #b79c68;
+  box-shadow: inset 0 1px 0 #ffffff27, 0 2px 0 #122331, 0 3px 7px #13232e55;
+  color: #fff0ca;
+}
+.citadel-control:active { transform: translateY(1px); }

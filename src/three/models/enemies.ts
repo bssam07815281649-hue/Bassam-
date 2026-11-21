@@ -19,6 +19,7 @@ export interface EnemyRig {
   hitMaterials: THREE.MeshStandardMaterial[];
   mixer?: THREE.AnimationMixer;
   locomotionAction?: THREE.AnimationAction;
+  attackAction?: THREE.AnimationAction;
   deathAction?: THREE.AnimationAction;
   isExternalGLB?: boolean;
 }

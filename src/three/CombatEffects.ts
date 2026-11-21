@@ -32,10 +32,11 @@ export class CombatEffects {
   private bursts: BurstEffect[] = [];
   private beams: BeamEffect[] = [];
 
-  private bulletGeo = new THREE.CapsuleGeometry(0.072, 0.38, 4, 6);
-  private cannonGeo = new THREE.SphereGeometry(0.26, 10, 8);
-  private sphereGeo = new THREE.SphereGeometry(1, 10, 8);
+  private bulletGeo = new THREE.LatheGeometry([[0,-.39],[.055,-.34],[.083,-.12],[.085,.12],[0,.31]].map(([r,y]) => new THREE.Vector2(r,y)), 8);
+  private cannonGeo = new THREE.IcosahedronGeometry(.27, 1);
+  private sphereGeo = new THREE.IcosahedronGeometry(1, 1);
 
+  private shockRing = new THREE.TorusGeometry(1, .065, 5, 32);
   private bulletMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
   private cannonMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
 
@@ -128,7 +129,9 @@ export class CombatEffects {
       opacity: 0.55,
       depthWrite: false,
     });
-    const dust = new THREE.Mesh(this.sphereGeo, dustMat);
+    const dust = new THREE.Mesh(this.shockRing, dustMat);
+    dust.rotation.x = -Math.PI / 2;
+    this.spawnRicochetSparks(pos);
     dust.position.set(pos.x, pos.y + 0.15, pos.z);
     this.group.add(dust);
     this.bursts.push({
@@ -315,6 +318,7 @@ export class CombatEffects {
     this.beams.length = 0;
     this.group.parent?.remove(this.group);
     this.bulletGeo.dispose();
+    this.shockRing.dispose();
     this.cannonGeo.dispose();
     this.sphereGeo.dispose();
     this.bulletMat.dispose();

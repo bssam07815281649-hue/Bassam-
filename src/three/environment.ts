@@ -47,6 +47,8 @@ const RIVER_POINTS: Array<[number, number]> = [
   [20.2, 10.5],
   [23.5, 18.5],
   [27.5, 28.0],
+  [30.0, 42.0],
+  [33.0, 62.0],
 ];
 
 function createRoadRibbonGeometry(curve: THREE.CatmullRomCurve3, width: number, segments: number): THREE.BufferGeometry {
@@ -118,6 +120,13 @@ function buildFortifiedHouse(mats: SharedMaterials): {
     group.add(shadow);
 
     group.add(houseAsset.scene);
+    for (const [key, x, z] of [['env_crate', -2.8, 1.5], ['env_barrel', -2.6, 2.2], ['env_sandbag', 2.4, 2]] as const) {
+      const prop = assetManager.cloneAsset(key);
+      if (prop) {
+        prop.scene.position.set(x, 0, z);
+        group.add(prop.scene);
+      }
+    }
     let mixer: THREE.AnimationMixer | undefined;
     if (houseAsset.animations.length > 0) {
       mixer = new THREE.AnimationMixer(houseAsset.scene);
@@ -441,14 +450,29 @@ export function createEnvironment(
     return h + cliffDz * 0; // keep reference clean
   };
 
+  // Frame the playable valley without occupying any buildable ground.
+  for (const [key, x, z, yaw, scale] of [
+    ['env_ridge', -25, -22, .45, 1.35], ['env_ridge', -14, -28, 2, 1.7],
+    ['env_ridge', 1, -31, 1.2, 1.3], ['env_ridge', 34, -18, 3, 1.5],
+    ['env_cottage', 25, -13, -.55, 1.15], ['env_cottage', 27, -9, -1.1, .9],
+    ['env_mill', 24, 5, -.65, 1.05], ['env_cottage', -24, -7, .45, 1],
+  ] as const) {
+    const prop = assetManager.cloneAsset(key);
+    if (!prop) continue;
+    prop.scene.position.set(x, terrainHeight(x, z), z);
+    prop.scene.rotation.y = yaw;
+    prop.scene.scale.setScalar(scale);
+    group.add(prop.scene);
+  }
+
   // 2. Rolling Meadow Terrain Mesh (116x116 extended so horizon blends into fog)
   const terrainGeo = new THREE.PlaneGeometry(116, 116, 96, 96);
   terrainGeo.rotateX(-Math.PI / 2);
   const posAttr = terrainGeo.attributes.position;
   const colors = new Float32Array(posAttr.count * 3);
-  const cGrass = new THREE.Color(0xb6b77a);
-  const cSunlit = new THREE.Color(0xe1d292);
-  const cBank = new THREE.Color(0x889462);
+  const cGrass = new THREE.Color(0xdceec9);
+  const cSunlit = new THREE.Color(0xfff2c9);
+  const cBank = new THREE.Color(0xb7d9be);
 
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i);
@@ -499,7 +523,7 @@ export function createEnvironment(
   // 4. Flowing Animated River & Waterfall
   const riverGeo = createRoadRibbonGeometry(riverCurve, 4.3, 90);
   const waterMat = new THREE.MeshPhysicalMaterial({
-    color: 0x528e96,
+    color: 0x359fbc,
     map: tex.waterNormal,
     roughness: 0.14,
     metalness: 0.08,
@@ -924,6 +948,20 @@ export function createEnvironment(
     }
   }
 
+  // Soft contact shadows keep the groves grounded when mobile shadow maps are off.
+  const groves = [...deciduousSpots, ...pineSpots];
+  const shadowGeometry = new THREE.PlaneGeometry(1, 1);
+  shadowGeometry.rotateX(-Math.PI / 2);
+  const shadowBatch = new THREE.InstancedMesh(shadowGeometry, mats.contactShadowMat, groves.length);
+  const shadowTransform = new THREE.Object3D();
+  groves.forEach((tree, index) => {
+    shadowTransform.position.set(tree.x, terrainHeight(tree.x, tree.z) + .045, tree.z);
+    shadowTransform.scale.set(3.9 * tree.scale, 1, 3.2 * tree.scale);
+    shadowTransform.updateMatrix();
+    shadowBatch.setMatrixAt(index, shadowTransform.matrix);
+  });
+  group.add(shadowBatch);
+
   // 9. Wildflowers & Shrubs scattered cleanly along meadow edges
   const flowerCount = 85;
   const flowerGeo = new THREE.OctahedronGeometry(0.14, 0);
@@ -1040,6 +1078,7 @@ export function createEnvironment(
       trunkMat.dispose();
       pineMat.dispose();
       rockMat.dispose();
+      shadowGeometry.dispose();
       flowerGeo.dispose();
       flowerMat.dispose();
     },

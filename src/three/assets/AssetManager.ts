@@ -104,7 +104,7 @@ class AssetManager {
     this.gltfLoader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
-    draco.preload();
+
     this.gltfLoader.setDRACOLoader(draco);
     this.gltfLoader.setMeshoptDecoder(MeshoptDecoder);
   }
@@ -122,12 +122,12 @@ class AssetManager {
     modelRoot.updateMatrixWorld(true);
 
     const baseNode = findNode(modelRoot, 'Base', BASE_NODE_PATTERN);
-    const turretNode = findNode(modelRoot, 'Turret', TURRET_NODE_PATTERN, baseNode);
+    const turretNode = modelRoot.getObjectByName('Turret') ?? findNode(modelRoot, 'Turret', TURRET_NODE_PATTERN, baseNode);
 
     // Prefer resolving Muzzle inside Turret first, then anywhere outside Base
     const muzzleSearchRoot = turretNode ?? modelRoot;
     const muzzleNode =
-      findNode(muzzleSearchRoot, 'Muzzle', MUZZLE_NODE_PATTERN, baseNode, turretNode) ??
+      muzzleSearchRoot.getObjectByName('Muzzle') ?? findNode(muzzleSearchRoot, 'Muzzle', MUZZLE_NODE_PATTERN, baseNode, turretNode) ??
       (turretNode ? findNode(modelRoot, 'Muzzle', MUZZLE_NODE_PATTERN, baseNode, turretNode) : null);
 
     // Optional recoil sub-node (e.g. QuadBarrels) inside Turret

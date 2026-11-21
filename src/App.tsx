@@ -10,6 +10,7 @@ import { QuestsModal } from './components/QuestsModal';
 import { soundEngine } from './game/audio';
 import { QUESTS, WAVES } from './game/data';
 import type { GameSnapshot, TargetPriority, TowerType } from './game/types';
+import { assetManager } from './three/assets/AssetManager';
 import { GameEngine } from './three/GameEngine';
 
 // Each GitHub Pages deployment injects its commit SHA as the build identifier.
@@ -71,19 +72,22 @@ export default function App() {
     const container = mountRef.current;
     if (!container) return;
 
-    let engine:GameEngine;
-    try {engine = new GameEngine(
-      container,
-      (nextSnap) => setSnapshot(nextSnap),
-      (lost) => setContextLost(lost),
-      (loaded) => setInfantryModelStatus(loaded ? 'loaded' : 'failed'),
-    );
-    }catch(error){console.error(error);setUnavailable(true);return;}
-    engineRef.current = engine;
-    if (showUpdateScreen) engine.setPaused(true);
-
+    let cancelled = false;
+    void assetManager.preloadFromManifest().then(() => {
+      if (cancelled) return;
+      try {
+        const engine = new GameEngine(container, setSnapshot, setContextLost,
+          loaded => setInfantryModelStatus(loaded ? 'loaded' : 'failed'));
+        engineRef.current = engine;
+        engine.setPaused(shouldShowUpdateScreen());
+      } catch (error) {
+        console.error(error);
+        setUnavailable(true);
+      }
+    });
     return () => {
-      engine.dispose();
+      cancelled = true;
+      engineRef.current?.dispose();
       engineRef.current = null;
     };
   }, []);
@@ -180,7 +184,7 @@ export default function App() {
       <div dir="rtl" role="status" className={`fixed bottom-24 left-2 z-20 rounded-lg border px-2 py-1 text-[11px] font-bold shadow-md ${infantryModelStatus === 'loaded' ? 'border-emerald-300/40 bg-emerald-900/90 text-emerald-100' : infantryModelStatus === 'failed' ? 'border-red-300/50 bg-red-950/90 text-red-100' : 'border-amber-300/40 bg-slate-900/90 text-amber-100'}`}>
         {infantryModelStatus === 'loaded' ? '✓ الجندي الجديد محمّل' : infantryModelStatus === 'failed' ? '⚠ فشل تحميل الجندي الجديد' : '… جاري تحميل الجندي الجديد'}
       </div>
-      <div className="fixed right-2 top-24 z-20 grid gap-1"><button aria-label="تكبير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(1.25)}>＋</button><button aria-label="تصغير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(.8)}>−</button></div>
+      <div className="fixed right-2 top-24 z-20 grid gap-1"><button aria-label="تكبير" className="citadel-control rounded px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(1.25)}>＋</button><button aria-label="تصغير" className="citadel-control rounded px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(.8)}>−</button></div>
       {/* Semantic HUD Overlay */}
       <TopHUD
         snapshot={snapshot}
@@ -249,11 +253,11 @@ export default function App() {
       {showUpdateScreen && !unavailable && (
         <div dir="rtl" role="dialog" aria-modal="true" aria-labelledby="update-screen-title" className="fixed inset-0 z-[80] flex items-center justify-center bg-[#080f11]/90 p-5 backdrop-blur-md">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/40 bg-gradient-to-b from-[#263b37] to-[#111d1c] p-6 text-center text-white shadow-2xl sm:p-8">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/15 text-4xl" aria-hidden="true">🏰</div>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/15 text-4xl" aria-hidden="true"><img src={import.meta.env.BASE_URL + "assets/citadel/house.webp"} alt="" className="h-16 w-16" /></div>
             <p className="mb-2 text-xs font-bold tracking-widest text-amber-300">حماية المنزل</p>
-            <h1 id="update-screen-title" className="font-display text-2xl font-extrabold text-white">اللعبة تحدّثت!</h1>
+            <h1 id="update-screen-title" className="font-display text-2xl font-extrabold text-white">حصن الوادي</h1>
             <p className="mx-auto mt-3 max-w-xs text-sm leading-7 text-stone-200">
-              وصل تحديث جديد للعبة. تگدر تكمل من آخر نقطة محفوظة، أو تبدأ لعبة جديدة.
+              وصلت خريطة حصن الوادي بجنودها وأبراجها الجديدة. تگدر تكمل من آخر نقطة محفوظة، أو تبدأ لعبة جديدة.
             </p>
             <p className="mt-2 text-xs text-amber-200/80">الحفظ يكون بين الموجات، مو أثناء المعركة.</p>
             <div className="mt-7 grid gap-3">

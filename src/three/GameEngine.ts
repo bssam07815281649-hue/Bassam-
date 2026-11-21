@@ -202,6 +202,10 @@ export class GameEngine {
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun);
 
+    sun.intensity = 1.95;
+    sun.color.setHex(0xffeac4);
+    hemi.intensity = .76;
+    this.renderer.toneMappingExposure = .9;
     const rim = new THREE.DirectionalLight(0x9bd2ff, 0.55);
     rim.position.set(-24, 18, -22);
     this.scene.add(rim);
@@ -263,7 +267,7 @@ export class GameEngine {
       try {
         await assetManager.preloadFromManifest();
         if (!assetManager.hasAsset('enemy_infantry')) {
-          const path = `${import.meta.env.BASE_URL}assets/models/enemies/rifle_infantry.glb`;
+          const path = `${import.meta.env.BASE_URL}assets/models/citadel/enemy_infantry.glb`;
           await assetManager.loadFromUrl('enemy_infantry', path, 'rifle_infantry.glb');
         }
         if (!this.disposed) {
@@ -629,8 +633,8 @@ export class GameEngine {
     this.emitSnapshot(true);
   }
 
-  private createEnemyVisual(type: EnemyType): EnemyRig {
-    const custom = assetManager.cloneEnemyAsset(type);
+  private createEnemyVisual(type: EnemyType, giant = false): EnemyRig {
+    const custom = giant ? assetManager.cloneAsset('enemy_giant') : assetManager.cloneEnemyAsset(type);
     const rig = custom ? adaptEnemyGLB(custom, type, this.materials) : createEnemyRig(type, this.materials);
     if (type === 'infantry' || type === 'heavy') {
       // Size the squad standard to both the animated model and its fallback.
@@ -661,7 +665,7 @@ export class GameEngine {
       previous.mixer?.stopAllAction();
       previous.root.remove(active.hpBarSprite);
       this.enemyLayerGroup.remove(previous.root);
-      const rig = this.createEnemyVisual(active.data.type);
+      const rig = this.createEnemyVisual(active.data.type, active.giant);
       rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
@@ -700,7 +704,7 @@ export class GameEngine {
     this.enemies.forEach((active) => {
       active.rig.mixer?.stopAllAction();
       this.enemyLayerGroup.remove(active.rig.root);
-      const rig = this.createEnemyVisual(active.data.type);
+      const rig = this.createEnemyVisual(active.data.type, active.giant);
       rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
@@ -764,7 +768,7 @@ export class GameEngine {
       deathTimer: 0,
     };
 
-    const rig = this.createEnemyVisual(type);
+    const rig = this.createEnemyVisual(type, giant);
     rig.root.position.set(data.x, data.y, data.z);
     rig.root.scale.setScalar(giant ? 1.95 : 1.35);
     this.enemyLayerGroup.add(rig.root);
@@ -1217,7 +1221,11 @@ export class GameEngine {
 
       // Advance along road curve
       const progressStep = (enemy.data.speed * simDt) / roadLen;
+      const previousProgress = enemy.data.pathProgress;
       enemy.data.pathProgress += progressStep;
+      if (previousProgress < .98 && enemy.data.pathProgress >= .98) {
+        enemy.rig.attackAction?.reset().fadeIn(.1).play();
+      }
 
       if (enemy.data.pathProgress >= 1) {
         const eDef = ENEMY_DEFINITIONS[enemy.data.type];

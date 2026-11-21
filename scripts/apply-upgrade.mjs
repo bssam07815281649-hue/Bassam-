@@ -103,10 +103,10 @@ change('src/three/CombatEffects.ts',s=>{
  return s;
 });
 change('src/three/environment.ts',s=>{
- s=replace(s,'const cGrass = new THREE.Color(0x6ea632);','const cGrass = new THREE.Color(0xb6b77a);','ground palette');
- s=replace(s,'const cSunlit = new THREE.Color(0x88bf3f);','const cSunlit = new THREE.Color(0xe1d292);','sunlight palette');
- s=replace(s,'const cBank = new THREE.Color(0x527c2b);','const cBank = new THREE.Color(0x889462);','river bank palette');
- s=replace(s,'    color: 0x3b9bd1,','    color: 0x528e96,','river teal');
+ s=replace(s,'const cGrass = new THREE.Color(0x6ea632);','const cGrass = new THREE.Color(0xdceec9);','ground palette');
+ s=replace(s,'const cSunlit = new THREE.Color(0x88bf3f);','const cSunlit = new THREE.Color(0xfff2c9);','sunlight palette');
+ s=replace(s,'const cBank = new THREE.Color(0x527c2b);','const cBank = new THREE.Color(0xb7d9be);','river bank palette');
+ s=replace(s,'    color: 0x3b9bd1,','    color: 0x359fbc,','river teal');
  return s;
 });
 change('src/App.tsx',s=>{

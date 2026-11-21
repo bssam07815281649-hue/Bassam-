@@ -40,10 +40,10 @@ function configureDataTexture(
 }
 
 export interface ProceduralTextures {
-  grassMap: THREE.CanvasTexture;
-  grassBump: THREE.CanvasTexture;
-  dirtMap: THREE.CanvasTexture;
-  dirtBump: THREE.CanvasTexture;
+  grassMap: THREE.Texture;
+  grassBump: THREE.Texture;
+  dirtMap: THREE.Texture;
+  dirtBump: THREE.Texture;
   stoneMap: THREE.CanvasTexture;
   stoneBump: THREE.CanvasTexture;
   roofTileMap: THREE.CanvasTexture;
@@ -58,87 +58,18 @@ export interface ProceduralTextures {
 export function createProceduralTextures(maxAnisotropy: number): ProceduralTextures {
   const aniso = Math.min(maxAnisotropy || 4, 8);
 
-  // 1. Stylized Sunlit Meadow Grass
-  const [gCanvas, gCtx] = createCanvas(512, 512);
-  gCtx.fillStyle = '#5c912b';
-  gCtx.fillRect(0, 0, 512, 512);
-  const [gbCanvas, gbCtx] = createCanvas(512, 512);
-  gbCtx.fillStyle = '#808080';
-  gbCtx.fillRect(0, 0, 512, 512);
-
-  for (let i = 0; i < 600; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const r = 10 + Math.random() * 28;
-    const shade = Math.random();
-    gCtx.fillStyle =
-      shade > 0.6
-        ? 'rgba(124, 175, 58, 0.28)'
-        : shade > 0.25
-          ? 'rgba(72, 122, 34, 0.28)'
-          : 'rgba(146, 186, 62, 0.18)';
-    gCtx.beginPath();
-    gCtx.arc(x, y, r, 0, Math.PI * 2);
-    gCtx.fill();
-  }
-  for (let i = 0; i < 4200; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const len = 3 + Math.random() * 5;
-    gCtx.strokeStyle = Math.random() > 0.45 ? 'rgba(138, 192, 64, 0.45)' : 'rgba(58, 98, 28, 0.45)';
-    gCtx.lineWidth = 1.2;
-    gCtx.beginPath();
-    gCtx.moveTo(x, y);
-    gCtx.lineTo(x + (Math.random() - 0.5) * 3, y - len);
-    gCtx.stroke();
-
-    gbCtx.strokeStyle = Math.random() > 0.5 ? 'rgba(210,210,210,0.35)' : 'rgba(60,60,60,0.35)';
-    gbCtx.lineWidth = 1;
-    gbCtx.beginPath();
-    gbCtx.moveTo(x, y);
-    gbCtx.lineTo(x, y - len);
-    gbCtx.stroke();
-  }
-  const grassMap = configureColorTexture(gCanvas, 10, 10, aniso);
-  const grassBump = configureDataTexture(gbCanvas, 10, 10, aniso);
-
-  // 2. Winding Dirt Road
-  const [dCanvas, dCtx] = createCanvas(512, 512);
-  dCtx.fillStyle = '#c89b62';
-  dCtx.fillRect(0, 0, 512, 512);
-  const [dbCanvas, dbCtx] = createCanvas(512, 512);
-  dbCtx.fillStyle = '#808080';
-  dbCtx.fillRect(0, 0, 512, 512);
-
-  // Subtle wagon ruts along U direction
-  const rutGrad = dCtx.createLinearGradient(0, 0, 0, 512);
-  rutGrad.addColorStop(0, 'rgba(110, 78, 42, 0.25)');
-  rutGrad.addColorStop(0.22, 'rgba(225, 190, 138, 0.25)');
-  rutGrad.addColorStop(0.35, 'rgba(145, 104, 58, 0.28)');
-  rutGrad.addColorStop(0.5, 'rgba(218, 178, 126, 0.22)');
-  rutGrad.addColorStop(0.65, 'rgba(145, 104, 58, 0.28)');
-  rutGrad.addColorStop(0.8, 'rgba(225, 190, 138, 0.25)');
-  rutGrad.addColorStop(1, 'rgba(110, 78, 42, 0.25)');
-  dCtx.fillStyle = rutGrad;
-  dCtx.fillRect(0, 0, 512, 512);
-
-  for (let i = 0; i < 2800; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const r = 0.8 + Math.random() * 2.6;
-    const light = Math.random() > 0.5;
-    dCtx.fillStyle = light ? 'rgba(238, 208, 165, 0.4)' : 'rgba(128, 90, 52, 0.38)';
-    dCtx.beginPath();
-    dCtx.arc(x, y, r, 0, Math.PI * 2);
-    dCtx.fill();
-
-    dbCtx.fillStyle = light ? 'rgba(200,200,200,0.45)' : 'rgba(70,70,70,0.45)';
-    dbCtx.beginPath();
-    dbCtx.arc(x, y, r, 0, Math.PI * 2);
-    dbCtx.fill();
-  }
-  const dirtMap = configureColorTexture(dCanvas, 18, 1, aniso);
-  const dirtBump = configureDataTexture(dbCanvas, 18, 1, aniso);
+  const loadTile = (name: string, x: number, y: number) => {
+    const texture = new THREE.TextureLoader().load(import.meta.env.BASE_URL + 'assets/citadel/' + name + '.webp');
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(x, y);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = aniso;
+    return texture;
+  };
+  const grassMap = loadTile('meadow', 27, 27);
+  const dirtMap = loadTile('cartway', 21, .45);
+  const grassBump = grassMap;
+  const dirtBump = dirtMap;
 
   // 3. Carved Stone Masonry
   const [sCanvas, sCtx] = createCanvas(512, 512);
@@ -294,9 +225,7 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     contactShadow,
     dispose: () => {
       grassMap.dispose();
-      grassBump.dispose();
       dirtMap.dispose();
-      dirtBump.dispose();
       stoneMap.dispose();
       stoneBump.dispose();
       roofTileMap.dispose();

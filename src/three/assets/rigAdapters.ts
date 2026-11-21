@@ -204,6 +204,7 @@ export function adaptEnemyGLB(
 
   let mixer: THREE.AnimationMixer | undefined;
   let locomotionAction: THREE.AnimationAction | undefined;
+  let attackAction: THREE.AnimationAction | undefined;
   let deathAction: THREE.AnimationAction | undefined;
 
   if (asset.animations.length > 0) {
@@ -215,6 +216,11 @@ export function adaptEnemyGLB(
     if (locoClip) {
       locomotionAction = mixer.clipAction(locoClip);
       locomotionAction.play();
+    }
+    const attackClip = pickClip(asset.animations, FIRE_CLIP_PATTERN);
+    if (attackClip && type === 'infantry') {
+      attackAction = mixer.clipAction(attackClip);
+      attackAction.setLoop(THREE.LoopOnce, 1);
     }
     const deathClip = pickClip(asset.animations, DEATH_CLIP_PATTERN);
     if (deathClip) {
@@ -233,6 +239,7 @@ export function adaptEnemyGLB(
     mixer,
     locomotionAction,
     deathAction,
+    attackAction,
     isExternalGLB: true,
   };
 }
