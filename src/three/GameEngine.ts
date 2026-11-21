@@ -130,6 +130,7 @@ export class GameEngine {
     container: HTMLElement,
     onSnapshot: (snap: GameSnapshot) => void,
     onContextLost: (lost: boolean) => void,
+    private onInfantryModelStatus?: (loaded: boolean) => void,
   ) {
     this.container = container;
     this.onSnapshot = onSnapshot;
@@ -258,10 +259,24 @@ export class GameEngine {
     this.emitSnapshot(true);
     this.scheduleNextTick();
 
-    // Load registered GLB assets asynchronously; update enemies already on the battlefield.
-    void assetManager.preloadFromManifest().then(() => {
-      if (!this.disposed) this.refreshLoadedEnemyModels();
-    }).catch((error) => console.warn('[GameEngine] Could not preload enemy models:', error));
+    // Always try the known infantry GLB directly, even if the generated model manifest is
+    // missing, stale, or cannot be fetched on GitHub Pages. This is the model's real path.
+    void (async () => {
+      try {
+        await assetManager.preloadFromManifest();
+        if (!assetManager.hasAsset('enemy_infantry')) {
+          const path = `${import.meta.env.BASE_URL}assets/models/enemies/rifle_infantry.glb`;
+          await assetManager.loadFromUrl('enemy_infantry', path, 'rifle_infantry.glb');
+        }
+        if (!this.disposed) {
+          this.refreshLoadedEnemyModels();
+          this.onInfantryModelStatus?.(assetManager.hasAsset('enemy_infantry'));
+        }
+      } catch (error) {
+        console.error('[GameEngine] Unable to load infantry GLB:', error);
+        if (!this.disposed) this.onInfantryModelStatus?.(false);
+      }
+    })();
   }
 
   private bindEvents(): void {
