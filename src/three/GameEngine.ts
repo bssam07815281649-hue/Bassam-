@@ -644,7 +644,7 @@ export class GameEngine {
       previous.root.remove(active.hpBarSprite);
       this.enemyLayerGroup.remove(previous.root);
       const rig = this.createEnemyVisual(active.data.type);
-      rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
+      rig.root.scale.setScalar(active.giant ? 1.95 : active.data.type === 'infantry' && rig.isExternalGLB ? 1.58 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
       if (active.data.shield <= 0) {
@@ -683,7 +683,7 @@ export class GameEngine {
       active.rig.mixer?.stopAllAction();
       this.enemyLayerGroup.remove(active.rig.root);
       const rig = this.createEnemyVisual(active.data.type);
-      rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
+      rig.root.scale.setScalar(active.giant ? 1.95 : active.data.type === 'infantry' && rig.isExternalGLB ? 1.58 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
       if (active.data.shield <= 0) {
@@ -748,7 +748,7 @@ export class GameEngine {
 
     const rig = this.createEnemyVisual(type);
     rig.root.position.set(data.x, data.y, data.z);
-    rig.root.scale.setScalar(giant ? 1.95 : 1.35);
+    rig.root.scale.setScalar(giant ? 1.95 : type === 'infantry' && rig.isExternalGLB ? 1.58 : 1.35);
     this.enemyLayerGroup.add(rig.root);
 
     // Floating crisp HP + Shield bar sprite
@@ -1261,6 +1261,16 @@ export class GameEngine {
             r.rotation.y += simDt * 28;
           });
         }
+      } else if (enemy.data.type === 'infantry' && !enemy.rig.locomotionAction) {
+        // Unrigged infantry GLB: approximate walking by springy steps, alternating lean
+        // and weight shifts. A true articulated gait requires an animated/rigged asset.
+        const stride = Math.sin(enemy.walkPhase);
+        const doubleStep = Math.abs(stride);
+        enemy.rig.bodyGroup.position.y = doubleStep * 0.10;
+        enemy.rig.bodyGroup.position.x = Math.sin(enemy.walkPhase * 0.5) * 0.055;
+        enemy.rig.bodyGroup.rotation.z = stride * 0.065;
+        enemy.rig.bodyGroup.rotation.x = Math.cos(enemy.walkPhase * 2) * 0.032;
+        enemy.rig.bodyGroup.rotation.y = Math.sin(enemy.walkPhase) * 0.035;
       } else if (enemy.data.isFlying) {
         enemy.rig.bodyGroup.position.y = Math.sin(this.simTime * 4.5 + enemy.walkPhase) * 0.12;
       }
