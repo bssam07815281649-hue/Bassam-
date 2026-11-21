@@ -27,7 +27,6 @@ export const TopHUD:React.FC<TopHUDProps>=({snapshot,muted,onToggleSpeed,onToggl
    <span className="text-[#e9dfbe] font-bold tracking-wide">FOREST KEEP</span>
    <span className="text-[#88a895]">•</span><b>Wave {snapshot.wave}/{snapshot.totalWaves}</b>
    {snapshot.waveState==='active'&&<span className="text-[#dfb58e]">{snapshot.enemiesRemaining} left</span>}
-   {snapshot.waveState==='countdown'&&<button className="rounded-md bg-[#d9b876] text-[#1f261b] px-2 py-1 font-bold text-[11px]" onClick={onSendWave}><Send size={11} className="inline me-1"/>Start {time}</button>}
   </div>
  </header>;
 };

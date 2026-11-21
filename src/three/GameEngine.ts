@@ -99,7 +99,7 @@ export class GameEngine {
   private maxHouseHp = 20;
   private waveIndex = 0; // 0-indexed into WAVES
   private waveState: GameSnapshot['waveState'] = 'countdown';
-  private countdownSeconds = 12;
+  private countdownSeconds = 1;
   private speedMultiplier: 1 | 2 = 1;
   private paused = false;
   private selectedBuildType: TowerType | null = null;
@@ -160,7 +160,7 @@ export class GameEngine {
     // Camera (Isometric miniature diorama angle)
     const aspect = Math.max(0.5, container.clientWidth / Math.max(1, container.clientHeight));
     this.camera = new THREE.PerspectiveCamera(40, aspect, 0.5, 220);
-    this.camera.position.set(-1, 33, 34);
+    this.camera.position.set(-8, 24, 26);
 
     this.controls = new MapControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !this.isSoftwareGl;
@@ -170,7 +170,7 @@ export class GameEngine {
     this.controls.maxDistance = 58;
     this.controls.minPolarAngle = Math.PI / 6;
     this.controls.maxPolarAngle = Math.PI / 2.65;
-    this.controls.target.set(1, 0, 1);
+    this.controls.target.set(-8, 0, 2);
     this.controls.update();
 
     // Lighting Rig (Warm golden sun + cool sky/earth hemisphere + gentle fill)
@@ -299,8 +299,35 @@ export class GameEngine {
     this.pointerDownPos.set(e.clientX, e.clientY);
   };
 
+  private ghost?:{type:TowerType;root:THREE.Group};
+  private placement: {point:THREE.Vector3; valid:boolean}|null=null;
+  public previewBuild(x:number,y:number,type:TowerType):void {
+    const rect=this.renderer.domElement.getBoundingClientRect();
+    this.raycaster.layers.set(0);
+    this.raycaster.setFromCamera(new THREE.Vector2((x-rect.left)/rect.width*2-1,1-(y-rect.top)/rect.height*2),this.camera);
+    const hit=this.raycaster.intersectObject(this.environment.ground,false)[0];
+    this.placement=hit?{point:hit.point,valid:this.environment.canBuild(hit.point.x,hit.point.z)&&
+      !Array.from(this.towers.values()).some(t=>Math.hypot(t.data.x-hit.point.x,t.data.z-hit.point.z)<2.4)&&this.gold>=TOWER_DEFINITIONS[type].costGold}:null;
+    if(hit){
+      if(this.ghost?.type!==type){
+        this.ghost?.root.removeFromParent();
+        const root=createTowerRig(type,1,this.materials).root;
+        this.ghost={type,root};this.scene.add(root);
+      }
+      this.ghost.root.position.copy(hit.point);
+    }
+    this.updateIndicators();
+  }
+  public dropBuild(x:number,y:number,type:TowerType):void {
+    this.previewBuild(x,y,type);
+    const spot=this.placement;this.placement=null;
+    if(!spot?.valid)return;
+    const pad=this.environment.addPad({id:'ground-'+this.idCounter++,x:spot.point.x,z:spot.point.z});
+    this.buildTowerAtPad(pad.id,type);
+  }
   private handlePointerMove = (e: PointerEvent): void => {
     if (this.disposed) return;
+    if(this.selectedBuildType){this.previewBuild(e.clientX,e.clientY,this.selectedBuildType);return;}
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -321,6 +348,7 @@ export class GameEngine {
     const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
     if (dist > 9) return; // Was a camera pan/drag, not a tap/click
 
+    if(this.selectedBuildType){this.dropBuild(e.clientX,e.clientY,this.selectedBuildType);return;}
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -364,7 +392,7 @@ export class GameEngine {
   // Public Controls API
   public setSelectedBuildType(type: TowerType | null): void {
     soundEngine.unlock();
-    this.selectedBuildType = this.selectedBuildType === type ? null : type;
+    this.selectedBuildType = type;this.placement=null;
     if (this.selectedBuildType) {
       this.selectedTowerId = null;
     }
@@ -399,8 +427,8 @@ export class GameEngine {
   }
 
   public resetCamera(): void {
-    this.camera.position.set(-1, 33, 34);
-    this.controls.target.set(1, 0, 1);
+    this.camera.position.set(-8, 24, 26);
+    this.controls.target.set(-8, 0, 2);
     this.controls.update();
   }
 
@@ -552,7 +580,7 @@ export class GameEngine {
     this.houseHp = 20;
     this.waveIndex = 0;
     this.waveState = 'countdown';
-    this.countdownSeconds = 12;
+    this.countdownSeconds = 1;
     this.paused = false;
     this.selectedBuildType = null;
     this.selectedTowerId = null;
@@ -577,8 +605,8 @@ export class GameEngine {
     this.scene.add(this.environment.group);
 
     this.towers.forEach((active) => {
-      const pad = this.environment.buildPads.find((p) => p.id === active.data.padId);
-      if (pad) pad.occupied = true;
+      const pad=this.environment.addPad({id:active.data.padId,x:active.data.x,z:active.data.z});
+      pad.occupied=true;
       const rot = active.rig.turretHead.rotation.y;
       active.data.turretYaw = rot;
       active.rig.mixer?.stopAllAction();
@@ -864,6 +892,16 @@ export class GameEngine {
     return best;
   }
 
+  private aimPoint(tower:ActiveTower,target:ActiveEnemy):THREE.Vector3{
+    const def=TOWER_DEFINITIONS[tower.data.type];
+    if(tower.data.type!=='cannon' && tower.data.type!=='gun')
+      return new THREE.Vector3(target.data.x,target.data.isFlying?2.35:.72,target.data.z);
+    const curve=this.environment.roadCurve;
+    const seconds=Math.hypot(target.data.x-tower.data.x,target.data.z-tower.data.z)/def.projectileSpeed;
+    const next=curve.getPointAt(Math.min(1,target.data.pathProgress+seconds*target.data.speed/curve.getLength()));
+    const now=curve.getPointAt(target.data.pathProgress);
+    return new THREE.Vector3(target.data.x+next.x-now.x,target.data.isFlying?2.35:.72,target.data.z+next.z-now.z);
+  }
   private fireTower(tower: ActiveTower, target: ActiveEnemy): void {
     const def = TOWER_DEFINITIONS[tower.data.type];
     const lvl = def.levels[tower.data.level - 1];
@@ -878,12 +916,7 @@ export class GameEngine {
       _vec3A.add(tower.rig.root.position);
     }
 
-    const targetPos = new THREE.Vector3(
-      target.data.x,
-      target.data.isFlying ? 2.35 : 0.72,
-      target.data.z,
-    );
-
+    const targetPos=this.aimPoint(tower,target);
     tower.recoil = 1.0;
     tower.rig.onFire?.();
 
@@ -964,23 +997,16 @@ export class GameEngine {
   }
 
   private updateIndicators(): void {
-    // Build pad rings
-    this.environment.buildPads.forEach((pad) => {
-      const mat = pad.ringMesh.material as THREE.MeshBasicMaterial;
-      if (pad.occupied) {
-        pad.ringMesh.visible = false;
-      } else if (this.selectedBuildType) {
-        pad.ringMesh.visible = true;
-        const hovered = this.hoveredPadId === pad.id;
-        mat.color.setHex(hovered ? 0x4ade80 : 0xfacc15);
-        mat.opacity = hovered ? 0.85 : 0.45;
-      } else {
-        pad.ringMesh.visible = this.hoveredPadId === pad.id;
-        mat.color.setHex(0xfbbf24);
-        mat.opacity = 0.4;
-      }
-    });
-
+    if(this.ghost)this.ghost.root.visible=Boolean(this.placement&&this.selectedBuildType);
+    const material=this.rangeIndicatorMesh.material as THREE.MeshBasicMaterial;
+    if(this.placement && this.selectedBuildType){
+      const {point,valid}=this.placement;
+      this.rangeIndicatorMesh.position.copy(point);this.rangeIndicatorMesh.position.y+=.15;
+      this.rangeIndicatorMesh.scale.setScalar(TOWER_DEFINITIONS[this.selectedBuildType].levels[0].range);
+      material.color.setHex(valid?0x64ee90:0xff5252);this.rangeIndicatorMesh.visible=true;
+      this.selectionRingMesh.position.copy(point);this.selectionRingMesh.position.y+=.16;this.selectionRingMesh.visible=true;return;
+    }
+    material.color.setHex(0x38bdf8);
     // Selected tower range & selection circle
     const sel = this.selectedTowerId ? this.towers.get(this.selectedTowerId) : undefined;
     if (sel) {
@@ -1058,7 +1084,8 @@ export class GameEngine {
       tower.data.cooldown -= simDt;
       const target = this.findTarget(tower);
       if (target) {
-        const desiredYaw = Math.atan2(target.data.x - tower.data.x, target.data.z - tower.data.z);
+        const aim=this.aimPoint(tower,target);
+        const desiredYaw=Math.atan2(aim.x-tower.data.x,aim.z-tower.data.z);
         let diff = desiredYaw - tower.rig.turretHead.rotation.y;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
@@ -1071,7 +1098,7 @@ export class GameEngine {
           });
         }
 
-        if (tower.data.cooldown <= 0 && Math.abs(diff) < 0.55) {
+        if (tower.data.cooldown <= 0 && Math.abs(diff) < 0.055) {
           const def = TOWER_DEFINITIONS[tower.data.type];
           const lvl = def.levels[tower.data.level - 1];
           tower.data.cooldown = 1 / lvl.fireRate;
@@ -1217,7 +1244,7 @@ export class GameEngine {
       } else {
         this.waveIndex += 1;
         this.waveState = 'countdown';
-        this.countdownSeconds = 15;
+        this.countdownSeconds = 0;
       }
       this.emitSnapshot(true);
     }
@@ -1254,9 +1281,10 @@ export class GameEngine {
           this.stats[k]=Math.max(0,Number(saved.stats[k])||0);
         }
       }
-      for(const t of saved.towers.slice(0,this.environment.buildPads.length)){
+      for(const t of saved.towers){
         if(!validTowerTypes.includes(t.type)||![1,2,3].includes(t.level))continue;
-        const pad=this.environment.buildPads.find(p=>p.id===t.padId&&!p.occupied);
+        if(!Number.isFinite(t.x)||!Number.isFinite(t.z))continue;
+        const pad=this.environment.addPad({id:t.padId,x:t.x,z:t.z});
         if(!pad)continue;
         const rig=createTowerRig(t.type,t.level,this.materials);
         const data: TowerInstance={...t,x:pad.x,z:pad.z,y:pad.group.position.y+.1,modelSource:rig.isExternalGLB?'glb':'procedural'};

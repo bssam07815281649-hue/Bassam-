@@ -43,6 +43,7 @@ export default function App() {
   const engineRef = useRef<GameEngine | null>(null);
 
   const [snapshot, setSnapshot] = useState<GameSnapshot>(INITIAL_SNAPSHOT);
+  const [unavailable,setUnavailable]=useState(false);
   const [contextLost, setContextLost] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.55);
@@ -56,11 +57,13 @@ export default function App() {
     const container = mountRef.current;
     if (!container) return;
 
-    const engine = new GameEngine(
+    let engine:GameEngine;
+    try {engine = new GameEngine(
       container,
       (nextSnap) => setSnapshot(nextSnap),
       (lost) => setContextLost(lost),
     );
+    }catch(error){console.error(error);setUnavailable(true);return;}
     engineRef.current = engine;
 
     return () => {
@@ -129,6 +132,7 @@ export default function App() {
       {/* Isolated WebGL Viewport Container */}
       <div ref={mountRef} className="absolute inset-0 h-full w-full" />
 
+      {unavailable&&<div dir="rtl" className="fixed inset-0 z-50 grid place-content-center bg-[#17291f] p-8 text-center text-white"><b>تعذّر تشغيل الرسومات الثلاثية الأبعاد</b><p>افتح رابط اللعبة في Chrome على هاتفك مع تفعيل WebGL.</p><button onClick={()=>location.reload()}>إعادة المحاولة</button></div>}
       {/* Context Lost Recovery Banner */}
       {contextLost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#181c15]/95 p-6 text-center">
@@ -173,6 +177,7 @@ export default function App() {
       <TowerDock
         gold={snapshot.gold}
         selectedBuildType={snapshot.selectedBuildType}
+        onDrag={(x,y,type,drop)=>drop?engineRef.current?.dropBuild(x,y,type):engineRef.current?.previewBuild(x,y,type)}
         onSelectBuildType={handleSelectBuildType}
       />
 

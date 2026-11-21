@@ -31,7 +31,7 @@ change('src/three/GameEngine.ts',s=>{
  // Hardening against duplicate async uploads is handled in App.
  // Saved checkpoints persist at intervals between waves and after edits, no mid-wave rewind corruption.
  s=replace(s,'    this.bindEvents();\n    this.emitSnapshot(true);','    this.restoreCheckpoint();\n    this.bindEvents();\n    this.emitSnapshot(true);','restore startup');
- s=replace(s,'  private emitSnapshot(force = false): void {',`  /** Save only between waves; a mid-wave reload resumes at the last safe checkpoint. */
+ if(!s.includes('private restoreCheckpoint(): void')) s=replace(s,'  private emitSnapshot(force = false): void {',`  /** Save only between waves; a mid-wave reload resumes at the last safe checkpoint. */
   private saveCheckpoint(): void {
     if (this.waveState !== 'countdown') return;
     try {

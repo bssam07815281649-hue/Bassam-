@@ -19,6 +19,9 @@ export interface EnvironmentRig {
   roadCurve: THREE.CatmullRomCurve3;
   buildPads: BuildPadVisual[];
   houseGroup: THREE.Group;
+  ground: THREE.Mesh;
+  canBuild(x:number,z:number):boolean;
+  addPad(pad:{id:string;x:number;z:number}):BuildPadVisual;
   update: (time: number, dt: number) => void;
   dispose: () => void;
 }
@@ -646,6 +649,7 @@ export function createEnvironment(
     leafVertices.setXYZ(i, r*x, r*y, r*z);
   }
   treeCanopyGeo.computeVertexNormals();
+  const leafRest=Array.from({length:leafVertices.count},(_,i)=>leafVertices.getX(i));
   const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1.4, 7);
   const pineConeGeo = new THREE.ConeGeometry(1, 1.5, 7);
   const rockGeo = new THREE.DodecahedronGeometry(1, 1);
@@ -956,57 +960,18 @@ export function createEnvironment(
   group.add(flowers);
 
   // 10. Tower Build Pads (12 circular carved stone foundations with subtle interactive ring)
-  const buildPads: BuildPadVisual[] = BUILD_PADS.map((pad) => {
-    const pGroup = new THREE.Group();
-    const py = terrainHeight(pad.x, pad.z);
-    pGroup.position.set(pad.x, py, pad.z);
-
-    // Recessed stone pad ring
-    const baseDisc = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.24, 0.12, 16), mats.stoneDark);
-    baseDisc.position.y = 0.04;
-    baseDisc.receiveShadow = true;
-    pGroup.add(baseDisc);
-
-    const innerDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.95, 0.13, 16), mats.stone);
-    innerDisc.position.y = 0.05;
-    innerDisc.receiveShadow = true;
-    pGroup.add(innerDisc);
-
-    // Highlight placement ring (visible when hovering or selecting a tower card)
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xfbbf24,
-      transparent: true,
-      opacity: 0.25,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    const ringMesh = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.2, 24), ringMat);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.y = 0.13;
-    pGroup.add(ringMesh);
-
-    // Invisible generous hit target cylinder for easy mobile tap & desktop raycast
-    const hitMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.45, 1.45, 0.5, 12),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    );
-    hitMesh.position.y = 0.25;
-    hitMesh.userData = { padId: pad.id };
-    hitMesh.layers.enable(1);
-    pGroup.add(hitMesh);
-
-    group.add(pGroup);
-    return {
-      id: pad.id,
-      x: pad.x,
-      z: pad.z,
-      group: pGroup,
-      ringMesh,
-      hitMesh,
-      occupied: false,
-    };
-  });
-
+  const buildPads: BuildPadVisual[] = [];
+  const addPad = (pad:{id:string;x:number;z:number}):BuildPadVisual => {
+    const marker=new THREE.Group();
+    marker.position.set(pad.x,terrainHeight(pad.x,pad.z),pad.z);
+    const hit=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,2.8,10),new THREE.MeshBasicMaterial({visible:false}));
+    hit.position.y=1.4;
+    hit.userData.padId=pad.id;
+    hit.layers.enable(1);
+    marker.add(hit);group.add(marker);
+    const item={...pad,group:marker,hitMesh:hit,ringMesh:hit,occupied:false};
+    buildPads.push(item);return item;
+  };
   // Flag wave vertex animation buffer
   const flagGeo = houseBuilt.flagMesh.geometry;
   const flagBaseZ = new Float32Array(flagGeo.attributes.position.count);
@@ -1017,9 +982,19 @@ export function createEnvironment(
   return {
     group,
     roadCurve,
-    buildPads,
+    buildPads,addPad,ground:terrainMesh,
+    canBuild:(x,z)=>Math.abs(x)<22 && Math.abs(z)<16 && terrainHeight(x,z)<.55 &&
+      distToSamples(x,z,roadSamples)>2.85 && distToSamples(x,z,riverSamples)>3.8 &&
+      Math.hypot(x-17.5,z+11.4)>4.5 &&
+      ![...deciduousSpots,...pineSpots].some(t=>Math.hypot(x-t.x,z-t.z)<1.6*t.scale) &&
+      !rockSpots.some(r=>Math.hypot(x-r.x,z-r.z)<1+Math.max(r.sx,r.sz)),
     houseGroup,
     update: (time: number, dt: number) => {
+      for(let i=0;i<leafVertices.count;i++){
+        const y=leafVertices.getY(i);
+        leafVertices.setX(i,leafRest[i]+(.018+.02*y)*Math.sin(time*1.65+y*2));
+      }
+      leafVertices.needsUpdate=true;
       // Animate flowing water & waterfall ripples
       tex.waterNormal.offset.x -= dt * 0.28;
       tex.waterNormal.offset.y += dt * 0.06;

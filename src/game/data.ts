@@ -212,7 +212,7 @@ export const WAVES: WaveDefinition[] = [
   {
     waveNumber: 1,
     title: 'Forward Skirmishers',
-    groups: [{ type: 'infantry', count: 10, interval: 0.85, delay: 0 }],
+    groups: [{ type: 'infantry', count: 7, interval: 0.95, delay: 0 }, { type: 'scout', count: 3, interval: 1.4, delay: 1.5 }],
     bonusGold: 45,
     bonusWood: 20,
   },

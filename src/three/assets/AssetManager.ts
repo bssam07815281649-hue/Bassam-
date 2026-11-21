@@ -172,7 +172,7 @@ class AssetManager {
 
     this.preloadPromise = (async () => {
       try {
-        const res = await fetch('/assets/models/manifest.json', { cache: 'no-store' });
+        const res = await fetch(import.meta.env.BASE_URL+'assets/models/manifest.json', { cache: 'no-store' });
         if (!res.ok) {
           this.manifestLoaded = true;
           return 0;
@@ -185,7 +185,7 @@ class AssetManager {
           const spec = MODEL_CATALOG[key];
           if (presentSet.has(spec.path) && !this.entries.has(key)) {
             tasks.push(
-              this.loadFromUrl(key, spec.path, spec.path.split('/').pop() || spec.path)
+              this.loadFromUrl(key, import.meta.env.BASE_URL+spec.path.slice(1), spec.path.split('/').pop() || spec.path)
                 .then((entry) => Boolean(entry))
                 .catch((err) => {
                   this.failedKeys.add(key);

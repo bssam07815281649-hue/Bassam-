@@ -332,12 +332,13 @@ function buildCannonTower(level: 1 | 2 | 3, mats: SharedMaterials): TowerRig {
     recoilGroup.add(crest);
   }
 
+  const bore=new THREE.Object3D();
+  bore.position.z=.74*scale;
+  recoilGroup.add(bore);
   enableShadows(root);
   return {
-    root,
-    turretHead,
-    recoilGroup,
-    muzzleLocal: new THREE.Vector3(0, 1.15, 0.85),
+    root,turretHead,recoilGroup,muzzleNode:bore,
+    muzzleLocal:new THREE.Vector3(0,1.15,.85),
   };
 }
 
@@ -594,10 +595,12 @@ function buildLightningTower(level: 1 | 2 | 3, mats: SharedMaterials): TowerRig 
 function finalizeProceduralTowerRig(rig: TowerRig): TowerRig {
   rig.root.updateMatrixWorld(true);
   rig.turretHead.name = 'Turret';
-  const muzzleNode = new THREE.Object3D();
-  muzzleNode.name = 'Muzzle';
-  muzzleNode.position.copy(rig.turretHead.worldToLocal(rig.muzzleLocal.clone()));
-  rig.turretHead.add(muzzleNode);
+  const muzzleNode=rig.muzzleNode ?? new THREE.Object3D();
+  muzzleNode.name='Muzzle';
+  if(!rig.muzzleNode){
+    muzzleNode.position.copy(rig.turretHead.worldToLocal(rig.muzzleLocal.clone()));
+    rig.turretHead.add(muzzleNode);
+  }
 
   rig.baseNode = rig.root;
   rig.turretNode = rig.turretHead;
@@ -610,7 +613,19 @@ function finalizeProceduralTowerRig(rig: TowerRig): TowerRig {
 export function createTowerRig(type: TowerType, level: 1 | 2 | 3, mats: SharedMaterials): TowerRig {
   const glbAsset = assetManager.cloneTowerAsset(type, level);
   if (glbAsset) {
-    return adaptTowerGLB(glbAsset, type, level, mats);
+    const rig=adaptTowerGLB(glbAsset,type,level,mats);
+    if(type==='lightning' && rig.muzzleNode){
+      // Use the model's normalized rotating pivot so the masonry stays planted.
+      const cradle=new THREE.Group();
+      cradle.position.copy(rig.turretHead.worldToLocal(rig.muzzleNode.getWorldPosition(new THREE.Vector3())));
+      rig.turretHead.add(cradle);
+      const stock=new THREE.Mesh(new THREE.CylinderGeometry(.048,.075,.72,10),mats.woodDark);
+      stock.rotation.x=Math.PI/2;cradle.add(stock);
+      const bow=new THREE.CatmullRomCurve3([new THREE.Vector3(-.38,0,-.12),new THREE.Vector3(0,.04,.16),new THREE.Vector3(.38,0,-.12)]);
+      cradle.add(new THREE.Mesh(new THREE.TubeGeometry(bow,12,.028,6,false),mats.copper));
+      const tip=new THREE.Object3D();tip.position.z=.37;cradle.add(tip);rig.muzzleNode=tip;
+    }
+    return rig;
   }
 
   switch (type) {
