@@ -162,13 +162,6 @@ export function adaptEnemyGLB(
       // while sharing BufferGeometry & Textures!
       if (m.material instanceof THREE.MeshStandardMaterial) {
         const instMat = m.material.clone();
-        if (type === 'infantry') {
-          // Safe standard PBR adjustments only; no custom shaders on mobile WebGL.
-          instMat.color.setRGB(1, 1, 1);
-          instMat.roughness = 0.76;
-          instMat.metalness = 0.08;
-          instMat.needsUpdate = true;
-        }
         m.material = instMat;
         hitMaterials.push(instMat);
       }
