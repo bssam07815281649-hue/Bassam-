@@ -19,6 +19,7 @@ import type {
 } from '../game/types';
 import { CombatEffects } from './CombatEffects';
 import { assetManager } from './assets/AssetManager';
+import { adaptEnemyGLB } from './assets/rigAdapters';
 import {enchantedForest,px,pz,toWorld} from './enchantedForest';
 import { type EnvironmentRig } from './environment';
 import { createSharedMaterials, detectSoftwareWebGL, type SharedMaterials } from './materials';
@@ -256,6 +257,11 @@ export class GameEngine {
     this.bindEvents();
     this.emitSnapshot(true);
     this.scheduleNextTick();
+
+    // Load registered GLB assets asynchronously; update enemies already on the battlefield.
+    void assetManager.preloadFromManifest().then(() => {
+      if (!this.disposed) this.refreshLoadedEnemyModels();
+    }).catch((error) => console.warn('[GameEngine] Could not preload enemy models:', error));
   }
 
   private bindEvents(): void {
@@ -603,6 +609,32 @@ export class GameEngine {
     this.emitSnapshot(true);
   }
 
+  private createEnemyVisual(type: EnemyType): EnemyRig {
+    const custom = assetManager.cloneEnemyAsset(type);
+    return custom ? adaptEnemyGLB(custom, type, this.materials) : createEnemyRig(type, this.materials);
+  }
+
+  private refreshLoadedEnemyModels(): void {
+    this.enemies.forEach((active) => {
+      if (active.rig.isExternalGLB || !assetManager.cloneEnemyAsset(active.data.type)) return;
+      const previous = active.rig;
+      previous.mixer?.stopAllAction();
+      previous.root.remove(active.hpBarSprite);
+      this.enemyLayerGroup.remove(previous.root);
+      const rig = this.createEnemyVisual(active.data.type);
+      rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
+      rig.root.position.set(active.data.x, active.data.y, active.data.z);
+      rig.root.rotation.y = active.data.rotationY;
+      if (active.data.shield <= 0) {
+        if (rig.shieldBubble) rig.shieldBubble.visible = false;
+        if (rig.shieldWire) rig.shieldWire.visible = false;
+      }
+      rig.root.add(active.hpBarSprite);
+      this.enemyLayerGroup.add(rig.root);
+      active.rig = rig;
+    });
+  }
+
   public rebuildAllCustomModels(): void {
     // Rebuild environment (house, props) and live towers/enemies after GLB load
     this.scene.remove(this.environment.group);
@@ -628,7 +660,7 @@ export class GameEngine {
     this.enemies.forEach((active) => {
       active.rig.mixer?.stopAllAction();
       this.enemyLayerGroup.remove(active.rig.root);
-      const rig = createEnemyRig(active.data.type, this.materials);
+      const rig = this.createEnemyVisual(active.data.type);
       rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
@@ -692,7 +724,7 @@ export class GameEngine {
       deathTimer: 0,
     };
 
-    const rig = createEnemyRig(type, this.materials);
+    const rig = this.createEnemyVisual(type);
     rig.root.position.set(data.x, data.y, data.z);
     rig.root.scale.setScalar(giant ? 1.95 : 1.35);
     this.enemyLayerGroup.add(rig.root);
