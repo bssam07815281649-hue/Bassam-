@@ -22,8 +22,8 @@ change('src/three/GameEngine.ts',s=>{
  s=replace(s,"import { assetManager } from './assets/AssetManager';","import { assetManager } from './assets/AssetManager';\nimport { createEnvironmentUpgrade } from './EnvironmentUpgrade';",'environment import');
  s=replace(s,'  private vfx: CombatEffects;','  private vfx: CombatEffects;\n  private decoration!: ReturnType<typeof createEnvironmentUpgrade>;','decoration property');
  s=replace(s,'    this.scene.add(this.environment.group);\n    this.scene.add(this.towerLayerGroup);','    this.scene.add(this.environment.group);\n    this.decoration = createEnvironmentUpgrade(this.environment.roadCurve);\n    this.scene.add(this.decoration.group);\n    this.scene.add(this.towerLayerGroup);','scenery initialization');
- s=replace(s,'    this.scene.background = new THREE.Color(0x9ec6d8);','    this.scene.background = new THREE.Color(0xb1cbc5);','sky tone');
- s=replace(s,'    this.scene.fog = new THREE.FogExp2(0xb8d7e0, 0.0085);','    this.scene.fog = new THREE.FogExp2(0xb4d0c2, 0.0105);','fog tone');
+ s=replace(s,'    this.scene.background = new THREE.Color(0x9ec6d8);','    this.scene.background = new THREE.Color(0xe4cb98);','sky tone');
+ s=replace(s,'    this.scene.fog = new THREE.FogExp2(0xb8d7e0, 0.0085);','    this.scene.fog = new THREE.FogExp2(0xe8d5a8, 0.005);','fog tone');
  s=replace(s,"    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));","    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, window.innerWidth < 780 ? 1.35 : 2));",'mobile render scaling');
  s=replace(s,'    sun.shadow.mapSize.set(2048, 2048);','    sun.shadow.mapSize.set(window.innerWidth < 780 ? 1024 : 2048, window.innerWidth < 780 ? 1024 : 2048);','mobile shadow resolution');
  s=replace(s,'    this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));','    this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));\n    this.decoration.update(this.simTime);','scenery animation');
@@ -111,10 +111,10 @@ change('src/three/CombatEffects.ts',s=>{
  return s;
 });
 change('src/three/environment.ts',s=>{
- s=replace(s,'const cGrass = new THREE.Color(0x6ea632);','const cGrass = new THREE.Color(0x547c3c);','ground palette');
- s=replace(s,'const cSunlit = new THREE.Color(0x88bf3f);','const cSunlit = new THREE.Color(0x83a85a);','sunlight palette');
- s=replace(s,'const cBank = new THREE.Color(0x527c2b);','const cBank = new THREE.Color(0x425f3b);','river bank palette');
- s=replace(s,'    color: 0x3b9bd1,','    color: 0x327d8d,','river teal');
+ s=replace(s,'const cGrass = new THREE.Color(0x6ea632);','const cGrass = new THREE.Color(0xb6b77a);','ground palette');
+ s=replace(s,'const cSunlit = new THREE.Color(0x88bf3f);','const cSunlit = new THREE.Color(0xe1d292);','sunlight palette');
+ s=replace(s,'const cBank = new THREE.Color(0x527c2b);','const cBank = new THREE.Color(0x889462);','river bank palette');
+ s=replace(s,'    color: 0x3b9bd1,','    color: 0x528e96,','river teal');
  return s;
 });
 change('src/App.tsx',s=>{
