@@ -162,6 +162,28 @@ export function adaptEnemyGLB(
       // while sharing BufferGeometry & Textures!
       if (m.material instanceof THREE.MeshStandardMaterial) {
         const instMat = m.material.clone();
+        if (type === 'infantry') {
+          // The imported infantry texture looks washed-out under the scene's warm lighting.
+          // Give only this enemy a brighter, punchier game-style surface.
+          instMat.color.setRGB(1, 1, 1);
+          instMat.roughness = Math.min(instMat.roughness, 0.72);
+          instMat.metalness = Math.min(instMat.metalness, 0.22);
+          if (instMat.map) {
+            instMat.emissiveMap = instMat.map;
+            instMat.emissive.setHex(0xffffff);
+            instMat.emissiveIntensity = 0.26;
+          }
+          // Increase chroma of the original texture without recoloring all other GLBs.
+          instMat.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <map_fragment>',
+              `#include <map_fragment>
+              float infantryLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+              diffuseColor.rgb = clamp(mix(vec3(infantryLuma), diffuseColor.rgb, 1.38), 0.0, 1.0);`,
+            );
+          };
+          instMat.customProgramCacheKey = () => 'infantry-vivid-saturation-v1';
+        }
         m.material = instMat;
         hitMaterials.push(instMat);
       }
