@@ -42,11 +42,13 @@ interface ActiveEnemy {
   hpBarCtx: CanvasRenderingContext2D;
   hpBarTexture: THREE.CanvasTexture;
   hpBarSprite: THREE.Sprite;
+  giant?: boolean;
 }
 
 interface SpawnQueueItem {
   type: EnemyType;
   spawnAt: number; // seconds since wave start
+  giant?: boolean;
 }
 
 interface FloatingLabel {
@@ -170,7 +172,7 @@ export class GameEngine {
     this.controls.screenSpacePanning = false;
     this.controls.enableRotate=false;
     this.controls.zoomToCursor=false;
-    this.controls.minZoom=1;this.controls.maxZoom=2.8;
+    this.controls.minZoom=0.9;this.controls.maxZoom=2.8;
     this.controls.touches.ONE=THREE.TOUCH.PAN;
     this.controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
     this.controls.mouseButtons.LEFT=THREE.MOUSE.PAN;
@@ -178,7 +180,7 @@ export class GameEngine {
     this.controls.maxDistance = 58;
     this.controls.minPolarAngle = Math.PI / 6;
     this.controls.maxPolarAngle = Math.PI / 2.65;
-    this.controls.target.set(-6,0,0);
+    this.controls.target.set(0,0,0);
     this.controls.update();
 
     this.handleResize();
@@ -290,7 +292,7 @@ export class GameEngine {
     const w = this.container.clientWidth;
     const h = Math.max(1, this.container.clientHeight);
     const aspect=w/h;
-    const half=Math.min(12,(302/px)/aspect);
+    const half=Math.min(19,(390/px)/aspect);
     this.camera.top=half;this.camera.bottom=-half;this.camera.left=-half*aspect;this.camera.right=half*aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
@@ -428,11 +430,11 @@ export class GameEngine {
     this.emitSnapshot(true);
   }
 
-  public zoomBy(factor:number):void {this.camera.zoom=THREE.MathUtils.clamp(this.camera.zoom*factor,1,2.8);this.camera.updateProjectionMatrix();this.boundCamera();}
+  public zoomBy(factor:number):void {this.camera.zoom=THREE.MathUtils.clamp(this.camera.zoom*factor,0.9,2.8);this.camera.updateProjectionMatrix();this.boundCamera();}
   public resetCamera(): void {
     this.camera.zoom=1;this.camera.updateProjectionMatrix();
     this.camera.position.set(-6,40,Math.sqrt(5)*20);
-    this.controls.target.set(-6,0,0);
+    this.controls.target.set(0,0,0);
     this.controls.update();
   }
 
@@ -627,6 +629,7 @@ export class GameEngine {
       active.rig.mixer?.stopAllAction();
       this.enemyLayerGroup.remove(active.rig.root);
       const rig = createEnemyRig(active.data.type, this.materials);
+      rig.root.scale.setScalar(active.giant ? 1.95 : 1.35);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.root.rotation.y = active.data.rotationY;
       if (active.data.shield <= 0) {
@@ -654,14 +657,15 @@ export class GameEngine {
         });
       }
     });
+    if (index >= 3 && index % 2 === 1) this.spawnQueue.push({type: 'heavy', spawnAt: 9 + index * 0.8, giant: true});
     this.spawnQueue.sort((a, b) => a.spawnAt - b.spawnAt);
     soundEngine.playWaveHorn();
   }
 
-  private spawnEnemy(type: EnemyType): void {
+  private spawnEnemy(type: EnemyType, giant = false): void {
     const def = ENEMY_DEFINITIONS[type];
-    const waveScale = 1 + this.waveIndex * 0.1;
-    const maxHp = Math.round(def.maxHp * waveScale);
+    const waveScale = 1 + this.waveIndex * 0.17;
+    const maxHp = Math.round(def.maxHp * waveScale * (giant ? 4.5 : 1));
     const maxShield = Math.round(def.maxShield * (1 + this.waveIndex * 0.08));
 
     const startPt = this.environment.roadCurve.getPointAt(0);
@@ -674,7 +678,7 @@ export class GameEngine {
       shield: maxShield,
       maxShield,
       pathProgress: 0,
-      speed: def.speed,
+      speed: giant ? def.speed * 0.72 : def.speed,
       x: startPt.x,
       y: 0,
       z: startPt.z,
@@ -690,6 +694,7 @@ export class GameEngine {
 
     const rig = createEnemyRig(type, this.materials);
     rig.root.position.set(data.x, data.y, data.z);
+    rig.root.scale.setScalar(giant ? 1.95 : 1.35);
     this.enemyLayerGroup.add(rig.root);
 
     // Floating crisp HP + Shield bar sprite
@@ -715,6 +720,7 @@ export class GameEngine {
       hpBarCtx,
       hpBarTexture,
       hpBarSprite,
+      giant,
     };
     this.redrawHealthBar(active);
     this.enemies.set(id, active);
@@ -1051,7 +1057,7 @@ export class GameEngine {
       this.waveElapsed += simDt;
       while (this.spawnQueue.length > 0 && this.spawnQueue[0].spawnAt <= this.waveElapsed) {
         const next = this.spawnQueue.shift()!;
-        this.spawnEnemy(next.type);
+        this.spawnEnemy(next.type, !!next.giant);
       }
     }
 
@@ -1377,8 +1383,10 @@ export class GameEngine {
   private boundCamera():void{
     const dx=this.camera.right/this.camera.zoom,dz=this.camera.top/this.camera.zoom*1.5;
     const t=this.controls.target;
-    const x=THREE.MathUtils.clamp(t.x,(52-400)/px+dx,(768-400)/px-dx);
-    const z=THREE.MathUtils.clamp(t.z,Math.max((125-225)/pz,(23-225)/pz+dz),(432-225)/pz-dz);
+    const minX=(52-400)/px+dx,maxX=(768-400)/px-dx;
+    const minZ=Math.max((125-225)/pz,(23-225)/pz+dz),maxZ=(432-225)/pz-dz;
+    const x=minX<=maxX?THREE.MathUtils.clamp(t.x,minX,maxX):(minX+maxX)/2;
+    const z=minZ<=maxZ?THREE.MathUtils.clamp(t.z,minZ,maxZ):(minZ+maxZ)/2;
     this.camera.position.x+=x-t.x;this.camera.position.z+=z-t.z;
     t.x=x;t.z=z;this.camera.updateMatrixWorld();
   }
