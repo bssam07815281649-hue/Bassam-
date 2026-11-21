@@ -32,8 +32,8 @@ export class CombatEffects {
   private bursts: BurstEffect[] = [];
   private beams: BeamEffect[] = [];
 
-  private bulletGeo = new THREE.CapsuleGeometry(0.045, 0.26, 4, 6);
-  private cannonGeo = new THREE.SphereGeometry(0.18, 10, 8);
+  private bulletGeo = new THREE.CapsuleGeometry(0.072, 0.38, 4, 6);
+  private cannonGeo = new THREE.SphereGeometry(0.26, 10, 8);
   private sphereGeo = new THREE.SphereGeometry(1, 10, 8);
 
   private bulletMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
