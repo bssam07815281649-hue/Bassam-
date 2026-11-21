@@ -24,8 +24,9 @@ export const TopHUD:React.FC<TopHUDProps>=({snapshot,muted,onToggleSpeed,onToggl
    </div>
   </div>
   <div className="pointer-events-auto mt-1.5 flex items-center justify-center gap-2 mx-auto w-fit max-w-[94vw] rounded-xl border border-[#dec88c]/30 bg-[#10251f]/90 px-3 py-1.5 shadow-lg backdrop-blur-md">
-   <span className="text-[#e9dfbe] font-bold tracking-wide">FOREST KEEP</span>
-   <span className="text-[#88a895]">•</span><b>Wave {snapshot.wave}/{snapshot.totalWaves}</b>
+   <span className="text-[#e9dfbe] font-bold tracking-wide">حصن الغابة</span>
+   <span className="text-[#88a895]">•</span><b>موجة {snapshot.wave}/{snapshot.totalWaves}</b>
+   <span>بناء {snapshot.buildsLeft}/2</span><span>ترقية {snapshot.upgradesLeft}/1</span>
    {snapshot.waveState==='active'&&<span className="text-[#dfb58e]">{snapshot.enemiesRemaining} left</span>}
   </div>
  </header>;

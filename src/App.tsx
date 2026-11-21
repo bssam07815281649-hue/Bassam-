@@ -12,7 +12,7 @@ import { QUESTS, WAVES } from './game/data';
 import type { GameSnapshot, TargetPriority, TowerType } from './game/types';
 import { GameEngine } from './three/GameEngine';
 
-const INITIAL_SNAPSHOT: GameSnapshot = {
+const INITIAL_SNAPSHOT: GameSnapshot = {buildsLeft:2,upgradesLeft:1,
   gold: 480,
   wood: 140,
   houseHp: 20,
@@ -145,6 +145,7 @@ export default function App() {
         </div>
       )}
 
+      <div className="fixed right-2 top-24 z-20 grid gap-1"><button aria-label="تكبير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(1.25)}>＋</button><button aria-label="تصغير" className="rounded bg-emerald-950/90 px-3 py-1 text-xl text-amber-200" onClick={()=>engineRef.current?.zoomBy(.8)}>−</button></div>
       {/* Semantic HUD Overlay */}
       <TopHUD
         snapshot={snapshot}
@@ -167,6 +168,7 @@ export default function App() {
           tower={snapshot.selectedTower}
           gold={snapshot.gold}
           wood={snapshot.wood}
+          upgradesLeft={snapshot.upgradesLeft}
           onUpgrade={() => engineRef.current?.upgradeSelectedTower()}
           onSell={() => engineRef.current?.sellSelectedTower()}
           onChangePriority={handleChangePriority}
@@ -177,6 +179,7 @@ export default function App() {
       <TowerDock
         gold={snapshot.gold}
         selectedBuildType={snapshot.selectedBuildType}
+        buildsLeft={snapshot.buildsLeft}
         onDrag={(x,y,type,drop)=>drop?engineRef.current?.dropBuild(x,y,type):engineRef.current?.previewBuild(x,y,type)}
         onSelectBuildType={handleSelectBuildType}
       />

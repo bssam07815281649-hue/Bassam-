@@ -3,12 +3,12 @@ import {ArrowUp,Trash2,X,Target} from 'lucide-react';
 import {TOWER_DEFINITIONS} from '../game/data';
 import {TowerIconSVG} from './TowerArtwork';
 import type {TargetPriority,TowerInstance} from '../game/types';
-interface TowerInspectorProps{tower:TowerInstance;gold:number;wood:number;onUpgrade:()=>void;onSell:()=>void;onChangePriority:(p:TargetPriority)=>void;onClose:()=>void}
-export const TowerInspector:React.FC<TowerInspectorProps>=({tower,gold,wood,onUpgrade,onSell,onChangePriority,onClose})=>{
- const d=TOWER_DEFINITIONS[tower.type],next=tower.level===1?d.levels[1]:tower.level===2?d.levels[2]:null,can=!!next&&gold>=next.upgradeGold&&wood>=next.upgradeWood;
+interface TowerInspectorProps{tower:TowerInstance;upgradesLeft:number;gold:number;wood:number;onUpgrade:()=>void;onSell:()=>void;onChangePriority:(p:TargetPriority)=>void;onClose:()=>void}
+export const TowerInspector:React.FC<TowerInspectorProps>=({tower,upgradesLeft,gold,wood,onUpgrade,onSell,onChangePriority,onClose})=>{
+ const d=TOWER_DEFINITIONS[tower.type],next=tower.level===1?d.levels[1]:tower.level===2?d.levels[2]:null,can=upgradesLeft>0&&!!next&&gold>=next.upgradeGold&&wood>=next.upgradeWood;
  return <div className="pointer-events-auto fixed z-30 bottom-[104px] sm:bottom-[120px] left-1/2 -translate-x-1/2 w-[min(94vw,370px)] rounded-2xl border border-[#d8c394]/35 bg-[#112b23]/95 p-2.5 shadow-2xl backdrop-blur-md text-[#f5edda]">
   <div className="flex justify-between items-center gap-2">
-   <div className="flex items-center gap-2"><span className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#456c4d]"><TowerIconSVG type={tower.type} className="h-8 w-8"/><span className="absolute -bottom-1 -right-1 rounded bg-amber-300 px-1 text-[9px] font-bold text-[#17291f]">L{tower.level}</span></span><div className="leading-tight"><strong className="text-xs">{d.name}</strong><div className="text-[10px] text-[#adc5b0]">Level {tower.level}/3 · {tower.kills} kills</div></div></div>
+   <div className="flex items-center gap-2"><span className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#456c4d]"><img src={import.meta.env.BASE_URL+"assets/arcane/"+tower.type+"-"+tower.level+".webp"} className="h-8 w-8"/><span className="absolute -bottom-1 -right-1 rounded bg-amber-300 px-1 text-[9px] font-bold text-[#17291f]">L{tower.level}</span></span><div className="leading-tight"><strong className="text-xs">{d.name}</strong><div className="text-[10px] text-[#adc5b0]">Level {tower.level}/3 · {tower.kills} kills</div></div></div>
    <button aria-label="Close inspector" onClick={onClose}><X size={17}/></button>
   </div>
   <div className="mt-2 flex items-center justify-between gap-1.5 text-[10px]">

@@ -535,16 +535,23 @@ export function createEnemyRig(type: EnemyType, mats: SharedMaterials): EnemyRig
     return adaptEnemyGLB(glbAsset, type, mats);
   }
 
-  switch (type) {
-    case 'infantry':
-      return buildInfantry(mats);
-    case 'scout':
-      return buildFastScout(mats);
-    case 'heavy':
-      return buildHeavyArmored(mats);
-    case 'shielded':
-      return buildShieldedVanguard(mats);
-    case 'drone':
-      return buildAerialDrone(mats);
+  const rigs={infantry:buildInfantry,scout:buildFastScout,heavy:buildHeavyArmored,shielded:buildShieldedVanguard,drone:buildAerialDrone};
+  const rig=rigs[type](mats);
+  const colors={infantry:0xc83b49,scout:0x23cba1,heavy:0xf78d2d,shielded:0x955de9,drone:0x24c2e4};
+  const enamel=makeMat(colors[type],.33,.45), trim=mats.goldTrim;
+  const mount=rig.head??rig.bodyGroup;
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(type==='drone'?.23:.1),enamel);
+  gem.position.set(0,.17,.09);gem.scale.y=1.7;mount.add(gem);
+  if(type==='drone'){
+    const halo=new THREE.Mesh(new THREE.TorusGeometry(.56,.028,8,32),trim);halo.rotation.x=Math.PI/2;halo.position.y=.19;mount.add(halo);
+  }else{
+    const width=type==='heavy'?.34:.215;
+    for(const side of [-1,1]){
+      const pauldron=new THREE.Mesh(new THREE.SphereGeometry(type==='heavy'?.22:.145,12,8,0,Math.PI*2,0,Math.PI*.66),enamel);
+      pauldron.position.set(side*width,type==='heavy'?1.04:.78,0);pauldron.rotation.z=-side*.3;rig.bodyGroup.add(pauldron);
+      const crest=new THREE.Mesh(new THREE.ConeGeometry(.055,type==='scout'?.31:.19,6),trim);
+      crest.position.set(side*.11,.18,-.01);crest.rotation.z=-side*.48;mount.add(crest);
+    }
   }
+  return rig;
 }

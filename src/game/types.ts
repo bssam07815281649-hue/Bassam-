@@ -141,6 +141,7 @@ export interface QuestProgress {
 }
 
 export interface GameSnapshot {
+  buildsLeft:number; upgradesLeft:number;
   gold: number;
   wood: number;
   houseHp: number;

@@ -19,15 +19,10 @@ function replace(s,from,to,label){
  return s.replace(from,to);
 }
 change('src/three/GameEngine.ts',s=>{
- s=replace(s,"import { assetManager } from './assets/AssetManager';","import { assetManager } from './assets/AssetManager';\nimport { createEnvironmentUpgrade } from './EnvironmentUpgrade';",'environment import');
- s=replace(s,'  private vfx: CombatEffects;','  private vfx: CombatEffects;\n  private decoration!: ReturnType<typeof createEnvironmentUpgrade>;','decoration property');
- s=replace(s,'    this.scene.add(this.environment.group);\n    this.scene.add(this.towerLayerGroup);','    this.scene.add(this.environment.group);\n    this.decoration = createEnvironmentUpgrade(this.environment.roadCurve);\n    this.scene.add(this.decoration.group);\n    this.scene.add(this.towerLayerGroup);','scenery initialization');
  s=replace(s,'    this.scene.background = new THREE.Color(0x9ec6d8);','    this.scene.background = new THREE.Color(0xe4cb98);','sky tone');
  s=replace(s,'    this.scene.fog = new THREE.FogExp2(0xb8d7e0, 0.0085);','    this.scene.fog = new THREE.FogExp2(0xe8d5a8, 0.005);','fog tone');
  s=replace(s,"    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));","    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, window.innerWidth < 780 ? 1.35 : 2));",'mobile render scaling');
  s=replace(s,'    sun.shadow.mapSize.set(2048, 2048);','    sun.shadow.mapSize.set(window.innerWidth < 780 ? 1024 : 2048, window.innerWidth < 780 ? 1024 : 2048);','mobile shadow resolution');
- s=replace(s,'    this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));','    this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));\n    this.decoration.update(this.simTime);','scenery animation');
- s=replace(s,'    this.environment.dispose();\n    this.materials.dispose();','    this.environment.dispose();\n    this.decoration.dispose();\n    this.materials.dispose();','scenery disposal');
  // Hardening against duplicate async uploads is handled in App.
  // Saved checkpoints persist at intervals between waves and after edits, no mid-wave rewind corruption.
  s=replace(s,'    this.bindEvents();\n    this.emitSnapshot(true);','    this.restoreCheckpoint();\n    this.bindEvents();\n    this.emitSnapshot(true);','restore startup');
@@ -84,9 +79,6 @@ change('src/three/GameEngine.ts',s=>{
     if(force && this.waveState==='countdown')this.saveCheckpoint();
 
     const selectedTower`,'checkpoint on snapshot');
- s=replace(s,'    this.environment.dispose();\n    this.environment = createEnvironment',`    this.environment.dispose();
-    this.environment = createEnvironment`,'environment rebuild');
- // Issue: old background layer may clash after environment rebuild, but road is fixed and decoration survives.
  return s;
 });
 change('src/three/CombatEffects.ts',s=>{

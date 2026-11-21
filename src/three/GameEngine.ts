@@ -1,3 +1,4 @@
+import {arcane} from './models/arcane';
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -18,11 +19,11 @@ import type {
 } from '../game/types';
 import { CombatEffects } from './CombatEffects';
 import { assetManager } from './assets/AssetManager';
-import { createEnvironmentUpgrade } from './EnvironmentUpgrade';
-import { createEnvironment, type EnvironmentRig } from './environment';
+import {enchantedForest,px,pz,toWorld} from './enchantedForest';
+import { type EnvironmentRig } from './environment';
 import { createSharedMaterials, detectSoftwareWebGL, type SharedMaterials } from './materials';
 import { createEnemyRig, type EnemyRig } from './models/enemies';
-import { createTowerRig, type TowerRig } from './models/towers';
+import { type TowerRig } from './models/towers';
 import { createProceduralTextures, type ProceduralTextures } from './textures';
 
 interface ActiveTower {
@@ -67,14 +68,13 @@ export class GameEngine {
   private isSoftwareGl: boolean;
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
   private controls: MapControls;
 
   private textures: ProceduralTextures;
   private materials: SharedMaterials;
   private environment: EnvironmentRig;
   private vfx: CombatEffects;
-  private decoration!: ReturnType<typeof createEnvironmentUpgrade>;
 
   private towerLayerGroup = new THREE.Group();
   private enemyLayerGroup = new THREE.Group();
@@ -97,6 +97,8 @@ export class GameEngine {
   private wood = 140;
   private houseHp = 20;
   private maxHouseHp = 20;
+  private buildsLeft=2;
+  private upgradesLeft=1;
   private waveIndex = 0; // 0-indexed into WAVES
   private waveState: GameSnapshot['waveState'] = 'countdown';
   private countdownSeconds = 1;
@@ -159,20 +161,27 @@ export class GameEngine {
 
     // Camera (Isometric miniature diorama angle)
     const aspect = Math.max(0.5, container.clientWidth / Math.max(1, container.clientHeight));
-    this.camera = new THREE.PerspectiveCamera(40, aspect, 0.5, 220);
-    this.camera.position.set(-8, 24, 26);
+    this.camera = new THREE.OrthographicCamera(-12*aspect,12*aspect,12,-12,.1,210);
+    this.camera.position.set(-6,40,Math.sqrt(5)*20);
 
     this.controls = new MapControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !this.isSoftwareGl;
     this.controls.dampingFactor = 0.07;
     this.controls.screenSpacePanning = false;
+    this.controls.enableRotate=false;
+    this.controls.zoomToCursor=false;
+    this.controls.minZoom=1;this.controls.maxZoom=2.8;
+    this.controls.touches.ONE=THREE.TOUCH.PAN;
+    this.controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
+    this.controls.mouseButtons.LEFT=THREE.MOUSE.PAN;
     this.controls.minDistance = 16;
     this.controls.maxDistance = 58;
     this.controls.minPolarAngle = Math.PI / 6;
     this.controls.maxPolarAngle = Math.PI / 2.65;
-    this.controls.target.set(-8, 0, 2);
+    this.controls.target.set(-6,0,0);
     this.controls.update();
 
+    this.handleResize();
     // Lighting Rig (Warm golden sun + cool sky/earth hemisphere + gentle fill)
     const hemi = new THREE.HemisphereLight(0xcbe8ff, 0x4b5c2b, 0.85);
     this.scene.add(hemi);
@@ -200,21 +209,12 @@ export class GameEngine {
     assetManager.setMaxAnisotropy(maxAnisotropy);
     this.textures = createProceduralTextures(maxAnisotropy);
     this.materials = createSharedMaterials(this.textures, this.isSoftwareGl);
-    this.environment = createEnvironment(this.textures, this.materials, this.isSoftwareGl);
+    this.environment = enchantedForest();
     this.scene.add(this.environment.group);
-    this.decoration = createEnvironmentUpgrade(this.environment.roadCurve);
-    this.scene.add(this.decoration.group);
     this.scene.add(this.towerLayerGroup);
     this.scene.add(this.enemyLayerGroup);
     this.scene.add(this.labelLayerGroup);
     this.vfx = new CombatEffects(this.scene);
-
-    // Preload any external GLB/GLTF models declared in /assets/models/manifest.json
-    void assetManager.preloadFromManifest().then((loadedCount) => {
-      if (loadedCount > 0 && !this.disposed) {
-        this.rebuildAllCustomModels();
-      }
-    });
 
     // Range & Selection indicators
     this.rangeIndicatorMesh = new THREE.Mesh(
@@ -289,7 +289,9 @@ export class GameEngine {
     if (this.disposed) return;
     const w = this.container.clientWidth;
     const h = Math.max(1, this.container.clientHeight);
-    this.camera.aspect = w / h;
+    const aspect=w/h;
+    const half=Math.min(12,(302/px)/aspect);
+    this.camera.top=half;this.camera.bottom=-half;this.camera.left=-half*aspect;this.camera.right=half*aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
   };
@@ -306,12 +308,12 @@ export class GameEngine {
     this.raycaster.layers.set(0);
     this.raycaster.setFromCamera(new THREE.Vector2((x-rect.left)/rect.width*2-1,1-(y-rect.top)/rect.height*2),this.camera);
     const hit=this.raycaster.intersectObject(this.environment.ground,false)[0];
-    this.placement=hit?{point:hit.point,valid:this.environment.canBuild(hit.point.x,hit.point.z)&&
+    this.placement=hit?{point:hit.point,valid:this.buildsLeft>0&&this.environment.canBuild(hit.point.x,hit.point.z)&&
       !Array.from(this.towers.values()).some(t=>Math.hypot(t.data.x-hit.point.x,t.data.z-hit.point.z)<2.4)&&this.gold>=TOWER_DEFINITIONS[type].costGold}:null;
     if(hit){
       if(this.ghost?.type!==type){
         this.ghost?.root.removeFromParent();
-        const root=createTowerRig(type,1,this.materials).root;
+        const root=arcane(type,1).root;
         this.ghost={type,root};this.scene.add(root);
       }
       this.ghost.root.position.copy(hit.point);
@@ -426,9 +428,11 @@ export class GameEngine {
     this.emitSnapshot(true);
   }
 
+  public zoomBy(factor:number):void {this.camera.zoom=THREE.MathUtils.clamp(this.camera.zoom*factor,1,2.8);this.camera.updateProjectionMatrix();this.boundCamera();}
   public resetCamera(): void {
-    this.camera.position.set(-8, 24, 26);
-    this.controls.target.set(-8, 0, 2);
+    this.camera.zoom=1;this.camera.updateProjectionMatrix();
+    this.camera.position.set(-6,40,Math.sqrt(5)*20);
+    this.controls.target.set(-6,0,0);
     this.controls.update();
   }
 
@@ -441,7 +445,7 @@ export class GameEngine {
 
   public buildTowerAtPad(padId: string, type: TowerType): boolean {
     const pad = this.environment.buildPads.find((p) => p.id === padId);
-    if (!pad || pad.occupied) return false;
+    if (!pad || pad.occupied || this.buildsLeft<=0) return false;
     const def = TOWER_DEFINITIONS[type];
     if (this.gold < def.costGold || this.wood < def.costWood) {
       return false;
@@ -449,9 +453,9 @@ export class GameEngine {
 
     this.gold -= def.costGold;
     this.wood -= def.costWood;
-    pad.occupied = true;
+    pad.occupied = true;this.buildsLeft--;
 
-    const rig = createTowerRig(type, 1, this.materials);
+    const rig = arcane(type,1);
     const id = `tower-${this.idCounter++}`;
     const data: TowerInstance = {
       id,
@@ -486,7 +490,7 @@ export class GameEngine {
   }
 
   public upgradeSelectedTower(): boolean {
-    if (!this.selectedTowerId) return false;
+    if (!this.selectedTowerId || this.upgradesLeft<=0) return false;
     const active = this.towers.get(this.selectedTowerId);
     if (!active || active.data.level >= 3) return false;
 
@@ -500,7 +504,7 @@ export class GameEngine {
 
     this.gold -= nextStats.upgradeGold;
     this.wood -= nextStats.upgradeWood;
-    active.data.level = nextLevel;
+    active.data.level = nextLevel;this.upgradesLeft--;
     active.data.investedGold += nextStats.upgradeGold;
     active.data.investedWood += nextStats.upgradeWood;
     if (nextLevel === 3) {
@@ -512,7 +516,7 @@ export class GameEngine {
     active.data.turretYaw = prevRotY;
     active.rig.mixer?.stopAllAction();
     this.towerLayerGroup.remove(active.rig.root);
-    const newRig = createTowerRig(active.data.type, nextLevel, this.materials);
+    const newRig = arcane(active.data.type,nextLevel);
     newRig.root.position.set(active.data.x, active.data.y, active.data.z);
     newRig.turretHead.rotation.y = prevRotY;
     this.towerLayerGroup.add(newRig.root);
@@ -578,7 +582,7 @@ export class GameEngine {
     this.gold = 480;
     this.wood = 140;
     this.houseHp = 20;
-    this.waveIndex = 0;
+    this.waveIndex = 0;this.buildsLeft=2;this.upgradesLeft=1;
     this.waveState = 'countdown';
     this.countdownSeconds = 1;
     this.paused = false;
@@ -601,7 +605,7 @@ export class GameEngine {
     // Rebuild environment (house, props) and live towers/enemies after GLB load
     this.scene.remove(this.environment.group);
     this.environment.dispose();
-    this.environment = createEnvironment(this.textures, this.materials, this.isSoftwareGl);
+    this.environment = enchantedForest();
     this.scene.add(this.environment.group);
 
     this.towers.forEach((active) => {
@@ -611,7 +615,7 @@ export class GameEngine {
       active.data.turretYaw = rot;
       active.rig.mixer?.stopAllAction();
       this.towerLayerGroup.remove(active.rig.root);
-      const rig = createTowerRig(active.data.type, active.data.level, this.materials);
+      const rig = arcane(active.data.type,active.data.level);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.turretHead.rotation.y = rot;
       this.towerLayerGroup.add(rig.root);
@@ -1030,7 +1034,6 @@ export class GameEngine {
 
     // Environment animations (water, flag, chimney smoke)
     this.environment.update(this.simTime, dt * (this.paused ? 0.2 : this.speedMultiplier));
-    this.decoration.update(this.simTime);
     this.updateIndicators();
 
     if (this.paused || this.waveState === 'victory' || this.waveState === 'defeat') {
@@ -1142,7 +1145,7 @@ export class GameEngine {
         const eDef = ENEMY_DEFINITIONS[enemy.data.type];
         this.houseHp = Math.max(0, this.houseHp - eDef.houseDamage);
         soundEngine.playHouseHit();
-        this.vfx.spawnExplosion(new THREE.Vector3(16.2, 0.8, -10.2), 1.8);
+        this.vfx.spawnExplosion(toWorld(639,125).setY(.8),1.8);
         enemy.rig.mixer?.stopAllAction();
         this.enemyLayerGroup.remove(enemy.rig.root);
         enemy.hpBarTexture.dispose();
@@ -1242,7 +1245,7 @@ export class GameEngine {
       if (this.waveIndex >= WAVES.length - 1) {
         this.waveState = 'victory';
       } else {
-        this.waveIndex += 1;
+        this.waveIndex += 1;this.buildsLeft=2;this.upgradesLeft=1;
         this.waveState = 'countdown';
         this.countdownSeconds = 0;
       }
@@ -1255,23 +1258,23 @@ export class GameEngine {
     if (this.waveState !== 'countdown') return;
     try {
       const state = {
-        version: 1, waveIndex: this.waveIndex, gold: this.gold, wood: this.wood,
+        buildsLeft:this.buildsLeft,upgradesLeft:this.upgradesLeft,version: 1, waveIndex: this.waveIndex, gold: this.gold, wood: this.wood,
         houseHp: this.houseHp, score: this.score, stats: this.stats,
         towers: [...this.towers.values()].map(v=>({...v.data})),
       };
-      window.localStorage.setItem('bassam-protect-house-checkpoint-v1',JSON.stringify(state));
+      window.localStorage.setItem('bassam-enchanted-pass-v1',JSON.stringify(state));
     } catch { /* Browsers may disable storage in privacy mode. */ }
   }
 
   private restoreCheckpoint(): void {
     try {
-      const raw=window.localStorage.getItem('bassam-protect-house-checkpoint-v1');
+      const raw=window.localStorage.getItem('bassam-enchanted-pass-v1');
       if(!raw)return;
       const saved=JSON.parse(raw);
       if(saved?.version!==1||!Array.isArray(saved.towers)||
          !Number.isFinite(saved.waveIndex)||saved.waveIndex<0||saved.waveIndex>=WAVES.length)return;
       const validTowerTypes=['gun','cannon','sniper','lightning'];
-      this.waveIndex=saved.waveIndex;
+      this.waveIndex=saved.waveIndex;this.buildsLeft=saved.buildsLeft??2;this.upgradesLeft=saved.upgradesLeft??1;
       this.gold=Math.max(0,Number(saved.gold)||0);
       this.wood=Math.max(0,Number(saved.wood)||0);
       this.houseHp=Math.max(1,Math.min(this.maxHouseHp,Number(saved.houseHp)||this.maxHouseHp));
@@ -1286,7 +1289,7 @@ export class GameEngine {
         if(!Number.isFinite(t.x)||!Number.isFinite(t.z))continue;
         const pad=this.environment.addPad({id:t.padId,x:t.x,z:t.z});
         if(!pad)continue;
-        const rig=createTowerRig(t.type,t.level,this.materials);
+        const rig=arcane(t.type,t.level);
         const data: TowerInstance={...t,x:pad.x,z:pad.z,y:pad.group.position.y+.1,modelSource:rig.isExternalGLB?'glb':'procedural'};
         rig.root.position.set(data.x,data.y,data.z);
         rig.turretHead.rotation.y=Number(t.turretYaw)||0;
@@ -1317,7 +1320,7 @@ export class GameEngine {
       minimapTowers.push({ x: t.data.x, z: t.data.z, type: t.data.type });
     });
 
-    this.onSnapshot({
+    this.onSnapshot({buildsLeft:this.buildsLeft,upgradesLeft:this.upgradesLeft,
       gold: this.gold,
       wood: this.wood,
       houseHp: this.houseHp,
@@ -1371,13 +1374,21 @@ export class GameEngine {
     }
   }
 
+  private boundCamera():void{
+    const dx=this.camera.right/this.camera.zoom,dz=this.camera.top/this.camera.zoom*1.5;
+    const t=this.controls.target;
+    const x=THREE.MathUtils.clamp(t.x,(52-400)/px+dx,(768-400)/px-dx);
+    const z=THREE.MathUtils.clamp(t.z,Math.max((125-225)/pz,(23-225)/pz+dz),(432-225)/pz-dz);
+    this.camera.position.x+=x-t.x;this.camera.position.z+=z-t.z;
+    t.x=x;t.z=z;this.camera.updateMatrixWorld();
+  }
   private tick = (): void => {
     if (this.disposed) return;
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.lastTime) / 1000);
     this.lastTime = now;
 
-    this.controls.update();
+    this.controls.update();this.boundCamera();
     this.stepSimulation(dt);
     this.renderer.render(this.scene, this.camera);
     this.emitSnapshot(false);
@@ -1397,7 +1408,6 @@ export class GameEngine {
     this.controls.dispose();
     this.vfx.dispose();
     this.environment.dispose();
-    this.decoration.dispose();
     this.materials.dispose();
     this.textures.dispose();
     this.renderer.dispose();
