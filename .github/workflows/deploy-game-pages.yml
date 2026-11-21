@@ -1,0 +1,47 @@
+name: Deploy Game to Pages
+on:
+  push:
+    branches: [game-upgrade]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: game-pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install
+      - run: npm run build -- --base=/Bassam-/
+      - name: Fix root-relative game assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for p in Path('dist').rglob('*'):
+              if p.suffix in ('.js','.json','.css','.html'):
+                  s=p.read_text()
+                  for prefix in ('/assets/models/','/src/assets/'):
+                      import re
+                      s=re.sub(r'(?<![\w/\-])'+re.escape(prefix), '/Bassam-'+prefix, s)
+                  p.write_text(s)
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
