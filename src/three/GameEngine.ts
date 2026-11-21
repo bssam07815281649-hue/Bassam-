@@ -427,6 +427,13 @@ export class GameEngine {
     this.emitSnapshot(true);
   }
 
+  /** Explicit pause state for the update/start screen (avoids accidental unpausing). */
+  public setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    this.emitSnapshot(true);
+  }
+
   public startNextWaveNow(): void {
     soundEngine.unlock();
     if (this.waveState !== 'countdown') return;
