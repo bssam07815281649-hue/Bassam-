@@ -30,7 +30,8 @@ jobs:
           for p in Path('dist').rglob('*'):
               if p.suffix in ('.js','.json','.css','.html'):
                   s=p.read_text()
-                  for prefix in ('/assets/models/','/src/assets/'):
+                  # Model URLs are constructed with Vite BASE_URL already; never prefix them twice.
+                  for prefix in ('/src/assets/',):
                       import re
                       s=re.sub(r'(?<![\w/\-])'+re.escape(prefix), '/Bassam-'+prefix, s)
                   p.write_text(s)
