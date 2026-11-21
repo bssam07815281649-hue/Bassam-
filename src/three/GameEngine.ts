@@ -1,4 +1,3 @@
-import {arcane} from './models/arcane';
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -20,11 +19,10 @@ import type {
 import { CombatEffects } from './CombatEffects';
 import { assetManager } from './assets/AssetManager';
 import { adaptEnemyGLB } from './assets/rigAdapters';
-import {enchantedForest,px,pz,toWorld} from './enchantedForest';
-import { type EnvironmentRig } from './environment';
+import { createEnvironment, type EnvironmentRig } from './environment';
 import { createSharedMaterials, detectSoftwareWebGL, type SharedMaterials } from './materials';
 import { createEnemyRig, type EnemyRig } from './models/enemies';
-import { type TowerRig } from './models/towers';
+import { createTowerRig, type TowerRig } from './models/towers';
 import { createProceduralTextures, type ProceduralTextures } from './textures';
 
 interface ActiveTower {
@@ -213,7 +211,7 @@ export class GameEngine {
     assetManager.setMaxAnisotropy(maxAnisotropy);
     this.textures = createProceduralTextures(maxAnisotropy);
     this.materials = createSharedMaterials(this.textures, this.isSoftwareGl);
-    this.environment = enchantedForest();
+    this.environment = createEnvironment(this.textures, this.materials, this.isSoftwareGl);
     this.scene.add(this.environment.group);
     this.scene.add(this.towerLayerGroup);
     this.scene.add(this.enemyLayerGroup);
@@ -313,7 +311,7 @@ export class GameEngine {
     const w = this.container.clientWidth;
     const h = Math.max(1, this.container.clientHeight);
     const aspect=w/h;
-    const half=Math.min(19,(390/px)/aspect);
+    const half=Math.min(19,35.5/aspect);
     this.camera.top=half;this.camera.bottom=-half;this.camera.left=-half*aspect;this.camera.right=half*aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
@@ -336,7 +334,7 @@ export class GameEngine {
     if(hit){
       if(this.ghost?.type!==type){
         this.ghost?.root.removeFromParent();
-        const root=arcane(type,1).root;
+        const root=createTowerRig(type, 1, this.materials).root;
         this.ghost={type,root};this.scene.add(root);
       }
       this.ghost.root.position.copy(hit.point);
@@ -485,7 +483,7 @@ export class GameEngine {
     this.wood -= def.costWood;
     pad.occupied = true;this.buildsLeft--;
 
-    const rig = arcane(type,1);
+    const rig = createTowerRig(type, 1, this.materials);
     const id = `tower-${this.idCounter++}`;
     const data: TowerInstance = {
       id,
@@ -546,7 +544,7 @@ export class GameEngine {
     active.data.turretYaw = prevRotY;
     active.rig.mixer?.stopAllAction();
     this.towerLayerGroup.remove(active.rig.root);
-    const newRig = arcane(active.data.type,nextLevel);
+    const newRig = createTowerRig(active.data.type, nextLevel, this.materials);
     newRig.root.position.set(active.data.x, active.data.y, active.data.z);
     newRig.turretHead.rotation.y = prevRotY;
     this.towerLayerGroup.add(newRig.root);
@@ -633,7 +631,27 @@ export class GameEngine {
 
   private createEnemyVisual(type: EnemyType): EnemyRig {
     const custom = assetManager.cloneEnemyAsset(type);
-    return custom ? adaptEnemyGLB(custom, type, this.materials) : createEnemyRig(type, this.materials);
+    const rig = custom ? adaptEnemyGLB(custom, type, this.materials) : createEnemyRig(type, this.materials);
+    if (type === 'infantry' || type === 'heavy') {
+      // Size the squad standard to both the animated model and its fallback.
+      const bounds = new THREE.Box3().setFromObject(rig.bodyGroup);
+      const height = bounds.max.y - bounds.min.y;
+      const standard = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .78, 6), this.materials.woodDark);
+      const cloth = new THREE.Shape();
+      cloth.moveTo(0, .38);
+      cloth.lineTo(.36, .32);
+      cloth.lineTo(.24, .21);
+      cloth.lineTo(.36, .12);
+      cloth.lineTo(0, .16);
+      cloth.closePath();
+      const flag = new THREE.Mesh(new THREE.ShapeGeometry(cloth), this.materials.flagBlue);
+      standard.add(pole, flag);
+      standard.scale.setScalar(height);
+      standard.position.set(-height * .15, bounds.min.y + height * .91, -height * .17);
+      rig.bodyGroup.add(standard);
+    }
+    return rig;
   }
 
   private refreshLoadedEnemyModels(): void {
@@ -661,7 +679,7 @@ export class GameEngine {
     // Rebuild environment (house, props) and live towers/enemies after GLB load
     this.scene.remove(this.environment.group);
     this.environment.dispose();
-    this.environment = enchantedForest();
+    this.environment = createEnvironment(this.textures, this.materials, this.isSoftwareGl);
     this.scene.add(this.environment.group);
 
     this.towers.forEach((active) => {
@@ -671,7 +689,7 @@ export class GameEngine {
       active.data.turretYaw = rot;
       active.rig.mixer?.stopAllAction();
       this.towerLayerGroup.remove(active.rig.root);
-      const rig = arcane(active.data.type,active.data.level);
+      const rig = createTowerRig(active.data.type, active.data.level, this.materials);
       rig.root.position.set(active.data.x, active.data.y, active.data.z);
       rig.turretHead.rotation.y = rot;
       this.towerLayerGroup.add(rig.root);
@@ -1205,7 +1223,7 @@ export class GameEngine {
         const eDef = ENEMY_DEFINITIONS[enemy.data.type];
         this.houseHp = Math.max(0, this.houseHp - eDef.houseDamage);
         soundEngine.playHouseHit();
-        this.vfx.spawnExplosion(toWorld(639,125).setY(.8),1.8);
+        this.vfx.spawnExplosion(this.environment.roadCurve.getPointAt(1).setY(.8),1.8);
         enemy.rig.mixer?.stopAllAction();
         this.enemyLayerGroup.remove(enemy.rig.root);
         enemy.hpBarTexture.dispose();
@@ -1349,7 +1367,7 @@ export class GameEngine {
         if(!Number.isFinite(t.x)||!Number.isFinite(t.z))continue;
         const pad=this.environment.addPad({id:t.padId,x:t.x,z:t.z});
         if(!pad)continue;
-        const rig=arcane(t.type,t.level);
+        const rig=createTowerRig(t.type, t.level, this.materials);
         const data: TowerInstance={...t,x:pad.x,z:pad.z,y:pad.group.position.y+.1,modelSource:rig.isExternalGLB?'glb':'procedural'};
         rig.root.position.set(data.x,data.y,data.z);
         rig.turretHead.rotation.y=Number(t.turretYaw)||0;
@@ -1437,8 +1455,8 @@ export class GameEngine {
   private boundCamera():void{
     const dx=this.camera.right/this.camera.zoom,dz=this.camera.top/this.camera.zoom*1.5;
     const t=this.controls.target;
-    const minX=(52-400)/px+dx,maxX=(768-400)/px-dx;
-    const minZ=Math.max((125-225)/pz,(23-225)/pz+dz),maxZ=(432-225)/pz-dz;
+    const minX=-32+dx,maxX=34-dx;
+    const minZ=Math.max(-14,-28+dz),maxZ=29-dz;
     const x=minX<=maxX?THREE.MathUtils.clamp(t.x,minX,maxX):(minX+maxX)/2;
     const z=minZ<=maxZ?THREE.MathUtils.clamp(t.z,minZ,maxZ):(minZ+maxZ)/2;
     this.camera.position.x+=x-t.x;this.camera.position.z+=z-t.z;
